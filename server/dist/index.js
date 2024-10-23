@@ -34,8 +34,8 @@ app.get("/test", (req, res) => {
         message: "Welcome to the API!",
         data: {
             name: "API Server",
-            version: "1.0.0"
-        }
+            version: "1.0.0",
+        },
     });
     res.send("Server is running!");
 });

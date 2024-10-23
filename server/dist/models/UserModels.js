@@ -31,36 +31,37 @@ const courseSchema = new mongoose_1.default.Schema({
 const userSchema = new mongoose_1.default.Schema({
     name: {
         type: String,
-        required: [true, 'Please provide a name'],
+        required: [true, "Please provide a name"],
         trim: true,
-        maxlength: [50, 'Name cannot be more than 50 characters'],
+        maxlength: [50, "Name cannot be more than 50 characters"],
     },
     email: {
         type: String,
-        required: [true, 'Please provide an email address'],
+        required: [true, "Please provide an email address"],
         unique: true,
         lowercase: true,
         trim: true,
         match: [
             /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-            'Please enter a valid email address',
+            "Please enter a valid email address",
         ],
     },
     password: {
         type: String,
-        required: [true, 'Please provide a password'],
-        minlength: [8, 'Password must be at least 8 characters long'],
+        required: [true, "Please provide a password"],
+        minlength: [8, "Password must be at least 8 characters long"],
         select: false,
     },
     role: {
         type: String,
-        enum: ['student', 'admin'],
-        default: 'student',
+        enum: ["student", "admin"],
+        default: "student",
     },
-    courses: [{
+    courses: [
+        {
             course: {
                 type: mongoose_1.default.Schema.Types.ObjectId,
-                ref: 'Course',
+                ref: "Course",
             },
             progress: {
                 type: Number,
@@ -70,13 +71,14 @@ const userSchema = new mongoose_1.default.Schema({
                 type: Date,
                 default: Date.now,
             },
-        }],
+        },
+    ],
     createdAt: {
         type: Date,
         default: Date.now,
     },
 });
-const Course = mongoose_1.default.model('Course', courseSchema);
+const Course = mongoose_1.default.model("Course", courseSchema);
 exports.Course = Course;
-const User = mongoose_1.default.model('User', userSchema);
+const User = mongoose_1.default.model("User", userSchema);
 exports.User = User;

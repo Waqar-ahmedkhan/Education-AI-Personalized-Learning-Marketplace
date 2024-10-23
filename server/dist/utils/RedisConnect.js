@@ -16,17 +16,17 @@ require("dotenv").config();
 const client = (0, redis_1.createClient)({
     url: process.env.REDIS_URL,
 });
-client.on('error', (err) => {
-    console.log('Redis Client Error:', err);
+client.on("error", (err) => {
+    console.log("Redis Client Error:", err);
 });
 // Connect to Redis
 const connectRedis = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield client.connect();
-        console.log('Redis connected successfully');
+        console.log("Redis connected successfully");
     }
     catch (error) {
-        console.error('Error connecting to Redis:', error);
+        console.error("Error connecting to Redis:", error);
     }
 });
 exports.connectRedis = connectRedis;

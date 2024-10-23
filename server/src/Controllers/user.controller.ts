@@ -1,6 +1,5 @@
 import { Request } from "express";
 import { CatchAsyncError } from "../middlewares/CatchAsyncError"
-import User from "../models/user.model";
 import UserModel from "../models/user.model";
 
 

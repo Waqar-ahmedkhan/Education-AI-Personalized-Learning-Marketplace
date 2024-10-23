@@ -87,7 +87,7 @@ const UserSchema = new Schema<IUser>({
     default: false
   },
   courses: {
-    type: [Schema.Types.Mixed], // Correct array of mixed types
+    type: [Schema.Types.ObjectId], // Correct array of mixed types
     default: []
   },
   passwordResetToken: {

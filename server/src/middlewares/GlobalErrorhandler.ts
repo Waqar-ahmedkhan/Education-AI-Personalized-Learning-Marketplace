@@ -32,9 +32,7 @@ const sendErrorProd = (err: AppError, res: Response) => {
 // Custom error handler for different cases
 export const globalErrorHandler = (
   err: AppError,
-  req: Request,
   res: Response,
-  next: NextFunction
 ) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";

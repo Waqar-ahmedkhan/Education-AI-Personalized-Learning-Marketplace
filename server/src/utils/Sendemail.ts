@@ -1,8 +1,8 @@
 // src/utils/emailService.ts
 import nodemailer, { Transporter } from "nodemailer";
+require("env").config();
 import ejs from "ejs";
 import path from "path";
-import { deflate } from "zlib";
 
 interface EmailOptions {
   email: string;
@@ -11,7 +11,7 @@ interface EmailOptions {
   data: { [key: string]: any };
 }
 
- const sendEmail = async (options: EmailOptions): Promise<void> => {
+const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
     const transporter: Transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -25,7 +25,7 @@ interface EmailOptions {
 
     const { email, subject, template, data } = options;
     const templatePath = path.join(__dirname, "../mails", template);
-    
+
     // Render template with provided data
     const html: string = await ejs.renderFile(templatePath, data);
 
@@ -43,4 +43,3 @@ interface EmailOptions {
 };
 
 export default sendEmail;
-

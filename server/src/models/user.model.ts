@@ -53,7 +53,7 @@ const UserSchema = new Schema<IUser>(
       required: [true, "Please enter your email"],
       unique: true,
       validate: {
-        validator: function(value: string) {
+        validator: function (value: string) {
           return gmailRegex.test(value);
         },
         message: "Please enter a valid Gmail address",
@@ -67,8 +67,9 @@ const UserSchema = new Schema<IUser>(
       minlength: [8, "Password must be at least 8 characters"],
       select: false,
       validate: {
-        validator: function(value: string) {
-          const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        validator: function (value: string) {
+          const passwordRegex =
+            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
           return passwordRegex.test(value);
         },
         message:
@@ -84,7 +85,7 @@ const UserSchema = new Schema<IUser>(
         type: String,
         required: true,
         validate: {
-          validator: function(value: string) {
+          validator: function (value: string) {
             return /^https?:\/\/.+\..+/.test(value);
           },
           message: "Please provide a valid URL for avatar",
@@ -100,11 +101,13 @@ const UserSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
-    courses: [{
-      type: Schema.Types.ObjectId,
-      ref: "Course",
-      default: [],
-    }],
+    courses: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Course",
+        default: [],
+      },
+    ],
     passwordResetToken: String,
     passwordResetExpires: Date,
     lastLogin: Date,
@@ -117,7 +120,7 @@ const UserSchema = new Schema<IUser>(
 );
 
 // Hash password before saving
-UserSchema.pre<IUser>("save", async function(next) {
+UserSchema.pre<IUser>("save", async function (next) {
   if (!this.isModified("password")) {
     return next();
   }
@@ -132,7 +135,7 @@ UserSchema.pre<IUser>("save", async function(next) {
 });
 
 // Compare password method
-UserSchema.methods.comparePassword = async function(
+UserSchema.methods.comparePassword = async function (
   password: string
 ): Promise<boolean> {
   try {
@@ -143,34 +146,35 @@ UserSchema.methods.comparePassword = async function(
 };
 
 // Generate password reset token
-UserSchema.methods.generatePasswordResetToken = async function(): Promise<string> {
-  const resetToken = crypto.randomBytes(32).toString("hex");
+UserSchema.methods.generatePasswordResetToken =
+  async function (): Promise<string> {
+    const resetToken = crypto.randomBytes(32).toString("hex");
 
-  this.passwordResetToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
-    .digest("hex");
+    this.passwordResetToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
 
-  this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-  await this.save();
+    await this.save();
 
-  return resetToken;
-};
+    return resetToken;
+  };
 
 // Static login method
-UserSchema.statics.login = async function(
+UserSchema.statics.login = async function (
   email: string,
   password: string
 ): Promise<IUser> {
   const user = await this.findOne({ email }).select("+password");
-  
+
   if (!user) {
     throw new Error("Invalid email or password");
   }
 
   const isMatch = await user.comparePassword(password);
-  
+
   if (!isMatch) {
     throw new Error("Invalid email or password");
   }

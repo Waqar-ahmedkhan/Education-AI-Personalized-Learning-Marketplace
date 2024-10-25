@@ -5,6 +5,7 @@ import UserModel, { IUser, IUserInput } from "../models/user.model";
 import { AppError } from "../utils/AppError";
 import jwt, { Secret } from "jsonwebtoken";
 import  sendEmail  from "../utils/Sendemail";
+require("env").config();
 
 interface IRegistrationBody {
   name: string;

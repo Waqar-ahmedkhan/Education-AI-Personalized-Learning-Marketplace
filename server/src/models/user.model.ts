@@ -1,9 +1,7 @@
-import mongoose, { Document, Schema } from "mongoose";
+// src/models/user.model.ts
+import mongoose, { Document, Model, Schema } from "mongoose";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-
-// Gmail regex pattern for email validation
-const gmailRegex: RegExp = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
 
 // Interface for avatar
 interface IAvatar {
@@ -11,22 +9,36 @@ interface IAvatar {
   url: string;
 }
 
-// User interface extending Document
-export interface IUser extends Document {
+// Base user interface without Document methods
+export interface IUserInput {
   name: string;
   email: string;
   password: string;
-  avatar: IAvatar;
-  role: string;
-  isVerified: boolean;
-  courses: any[];
+  avatar?: IAvatar;
+  role?: string;
+  isVerified?: boolean;
+  courses?: mongoose.Types.ObjectId[];
   passwordResetToken?: string;
   passwordResetExpires?: Date;
   lastLogin?: Date;
-  comparePassword: (password: string) => Promise<boolean>;
 }
 
-// Create the Mongoose schema with complete property definitions
+// User interface extending Document
+export interface IUser extends IUserInput, Document {
+  comparePassword(password: string): Promise<boolean>;
+  generatePasswordResetToken(): Promise<string>;
+  _doc: any;
+}
+
+// Interface for the User Model
+interface IUserModel extends Model<IUser> {
+  login(email: string, password: string): Promise<IUser>;
+}
+
+// Gmail regex pattern for email validation
+const gmailRegex: RegExp = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+
+// Create the Mongoose schema
 const UserSchema = new Schema<IUser>(
   {
     name: {
@@ -41,7 +53,7 @@ const UserSchema = new Schema<IUser>(
       required: [true, "Please enter your email"],
       unique: true,
       validate: {
-        validator: function (value: string) {
+        validator: function(value: string) {
           return gmailRegex.test(value);
         },
         message: "Please enter a valid Gmail address",
@@ -55,9 +67,8 @@ const UserSchema = new Schema<IUser>(
       minlength: [8, "Password must be at least 8 characters"],
       select: false,
       validate: {
-        validator: function (value: string) {
-          const passwordRegex =
-            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        validator: function(value: string) {
+          const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
           return passwordRegex.test(value);
         },
         message:
@@ -73,7 +84,7 @@ const UserSchema = new Schema<IUser>(
         type: String,
         required: true,
         validate: {
-          validator: function (value: string) {
+          validator: function(value: string) {
             return /^https?:\/\/.+\..+/.test(value);
           },
           message: "Please provide a valid URL for avatar",
@@ -89,23 +100,14 @@ const UserSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
-    courses: {
-      type: [Schema.Types.ObjectId], // Correct definition of array of Mixed types
-      ref: "Courses",
+    courses: [{
+      type: Schema.Types.ObjectId,
+      ref: "Course",
       default: [],
-    },
-    passwordResetToken: {
-      type: String,
-      default: undefined,
-    },
-    passwordResetExpires: {
-      type: Date,
-      default: undefined,
-    },
-    lastLogin: {
-      type: Date,
-      default: undefined,
-    },
+    }],
+    passwordResetToken: String,
+    passwordResetExpires: Date,
+    lastLogin: Date,
   },
   {
     timestamps: true,
@@ -115,11 +117,13 @@ const UserSchema = new Schema<IUser>(
 );
 
 // Hash password before saving
-UserSchema.pre<IUser>("save", async function (next) {
-  if (!this.isModified("password")) return next();
+UserSchema.pre<IUser>("save", async function(next) {
+  if (!this.isModified("password")) {
+    return next();
+  }
 
   try {
-    const salt = await bcrypt.genSalt(12);
+    const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (error: any) {
@@ -128,7 +132,7 @@ UserSchema.pre<IUser>("save", async function (next) {
 });
 
 // Compare password method
-UserSchema.methods.comparePassword = async function (
+UserSchema.methods.comparePassword = async function(
   password: string
 ): Promise<boolean> {
   try {
@@ -138,40 +142,8 @@ UserSchema.methods.comparePassword = async function (
   }
 };
 
-// Utility methods for course management
-UserSchema.methods.addCourse = async function (courseData: any): Promise<void> {
-  this.courses.push(courseData);
-  await this.save();
-};
-
-UserSchema.methods.removeCourse = async function (
-  courseIdentifier: any
-): Promise<void> {
-  this.courses = this.courses.filter((course: any) => {
-    return JSON.stringify(course) !== JSON.stringify(courseIdentifier);
-  });
-  await this.save();
-};
-
-UserSchema.methods.updateCourse = async function (
-  courseIdentifier: any,
-  newData: any
-): Promise<void> {
-  const courseIndex = this.courses.findIndex((course: any) => {
-    return JSON.stringify(course) === JSON.stringify(courseIdentifier);
-  });
-
-  if (courseIndex !== -1) {
-    this.courses[courseIndex] = {
-      ...this.courses[courseIndex],
-      ...newData,
-    };
-    await this.save();
-  }
-};
-
-// Method to generate password reset token
-UserSchema.methods.createPasswordResetToken = function (): string {
+// Generate password reset token
+UserSchema.methods.generatePasswordResetToken = async function(): Promise<string> {
   const resetToken = crypto.randomBytes(32).toString("hex");
 
   this.passwordResetToken = crypto
@@ -181,25 +153,34 @@ UserSchema.methods.createPasswordResetToken = function (): string {
 
   this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+  await this.save();
+
   return resetToken;
 };
 
-// Index for email field
-UserSchema.index({ email: 1 });
+// Static login method
+UserSchema.statics.login = async function(
+  email: string,
+  password: string
+): Promise<IUser> {
+  const user = await this.findOne({ email }).select("+password");
+  
+  if (!user) {
+    throw new Error("Invalid email or password");
+  }
 
-const UserModel = mongoose.model<IUser>("User", UserSchema);
+  const isMatch = await user.comparePassword(password);
+  
+  if (!isMatch) {
+    throw new Error("Invalid email or password");
+  }
+
+  user.lastLogin = new Date();
+  await user.save();
+
+  return user;
+};
+
+const UserModel = mongoose.model<IUser, IUserModel>("User", UserSchema);
+
 export default UserModel;
-
-// Example usage types
-export type CreateUserInput = Omit<
-  IUser,
-  "courses" | "comparePassword" | keyof Document
->;
-export type UpdateUserInput = Partial<CreateUserInput>;
-
-// Helper type for course operations
-export interface CourseOperations {
-  addCourse(courseData: any): Promise<void>;
-  removeCourse(courseIdentifier: any): Promise<void>;
-  updateCourse(courseIdentifier: any, newData: any): Promise<void>;
-}

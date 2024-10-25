@@ -12,7 +12,7 @@ const AppError_1 = require("./utils/AppError");
 const GlobalErrorhandler_1 = require("./middlewares/GlobalErrorhandler");
 const dbConnect_1 = __importDefault(require("./utils/dbConnect"));
 const RedisConnect_1 = require("./utils/RedisConnect");
-const userRoute_1 = __importDefault(require("./routes/userRoute"));
+const user_route_1 = __importDefault(require("./routes/user.route"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
@@ -24,7 +24,7 @@ app.use((0, cookie_parser_1.default)());
 //connectDbs
 (0, dbConnect_1.default)();
 (0, RedisConnect_1.connectRedis)();
-app.use("/api/v1", userRoute_1.default);
+app.use("/api/v1", user_route_1.default);
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send("Something went wrong");

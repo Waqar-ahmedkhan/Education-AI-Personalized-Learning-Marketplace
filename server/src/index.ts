@@ -7,7 +7,7 @@ import { AppError } from "./utils/AppError";
 import { globalErrorHandler } from "./middlewares/GlobalErrorhandler";
 import connectDB from "./utils/dbConnect";
 import { connectRedis } from "./utils/RedisConnect";
-import userRoute from "./routes/userRoute";
+import  UserRoute  from "./routes/user.route"
 
 dotenv.config();
 
@@ -25,7 +25,7 @@ connectDB();
 connectRedis();
 
 
-app.use("/api/v1", userRoute)
+app.use("/api/v1", UserRoute)
 app.use((err: Error, req: Request, res: Response, next: () => void) => {
   console.error(err.stack);
   res.status(500).send("Something went wrong");

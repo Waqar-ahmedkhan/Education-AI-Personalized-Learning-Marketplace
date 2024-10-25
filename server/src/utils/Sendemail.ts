@@ -1,15 +1,19 @@
 // src/utils/emailService.ts
 import nodemailer, { Transporter } from "nodemailer";
-require("env").config();
+import dotenv from "dotenv"
 import ejs from "ejs";
 import path from "path";
 
+dotenv.config();
 interface EmailOptions {
   email: string;
   subject: string;
   template: string;
   data: { [key: string]: any };
 }
+
+console.log(`Using SMTP_MAIL: ${process.env.SMTP_MAIL}`);
+
 
 const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
@@ -24,7 +28,14 @@ const sendEmail = async (options: EmailOptions): Promise<void> => {
     });
 
     const { email, subject, template, data } = options;
-    const templatePath = path.join(__dirname, "../mails", template);
+
+    const templatePath = path.join(
+      __dirname, 
+      process.env.NODE_ENV === 'production' ? '../../src/mails' : '../mails', 
+      `${template}`
+    );
+    
+
 
     // Render template with provided data
     const html: string = await ejs.renderFile(templatePath, data);

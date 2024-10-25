@@ -14,9 +14,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 // src/utils/emailService.ts
 const nodemailer_1 = __importDefault(require("nodemailer"));
-require("env").config();
+const dotenv_1 = __importDefault(require("dotenv"));
 const ejs_1 = __importDefault(require("ejs"));
 const path_1 = __importDefault(require("path"));
+dotenv_1.default.config();
+console.log(`Using SMTP_MAIL: ${process.env.SMTP_MAIL}`);
 const sendEmail = (options) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const transporter = nodemailer_1.default.createTransport({
@@ -29,7 +31,7 @@ const sendEmail = (options) => __awaiter(void 0, void 0, void 0, function* () {
             },
         });
         const { email, subject, template, data } = options;
-        const templatePath = path_1.default.join(__dirname, "../mails", template);
+        const templatePath = path_1.default.join(__dirname, process.env.NODE_ENV === 'production' ? '../../src/mails' : '../mails', `${template}`);
         // Render template with provided data
         const html = yield ejs_1.default.renderFile(templatePath, data);
         const mailOptions = {

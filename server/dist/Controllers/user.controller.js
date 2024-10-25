@@ -68,7 +68,7 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
         // Create new user
         let newUser;
         try {
-            newUser = yield user_model_1.default.create(userInput);
+            // newUser = await UserModel.create(userInput);
         }
         catch (userError) {
             console.error('User creation error:', userError);
@@ -92,9 +92,9 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
         }
         catch (emailError) {
             // If email fails, delete the created user
-            if (newUser) {
-                yield user_model_1.default.findByIdAndDelete(newUser._id);
-            }
+            // if (newUser) {
+            //   await UserModel.findByIdAndDelete(newUser._id);
+            // }
             console.error('Email sending error:', emailError);
             return next(new AppError_1.AppError("Failed to send activation email", 500));
         }

@@ -84,7 +84,7 @@ export const registerUser = CatchAsyncError(
       // Create new user
       let newUser;
       try {
-        newUser = await UserModel.create(userInput);
+        // newUser = await UserModel.create(userInput);
       } catch (userError: any) {
         console.error('User creation error:', userError);
         if (userError.code === 11000) {
@@ -109,9 +109,9 @@ export const registerUser = CatchAsyncError(
         });
       } catch (emailError: any) {
         // If email fails, delete the created user
-        if (newUser) {
-          await UserModel.findByIdAndDelete(newUser._id);
-        }
+        // if (newUser) {
+        //   await UserModel.findByIdAndDelete(newUser._id);
+        // }
         console.error('Email sending error:', emailError);
         return next(new AppError("Failed to send activation email", 500));
       }

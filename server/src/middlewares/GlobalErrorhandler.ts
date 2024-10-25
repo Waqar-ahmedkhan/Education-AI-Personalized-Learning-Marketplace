@@ -1,9 +1,30 @@
+// src/middlewares/errorHandler.ts
 import { Request, Response, NextFunction } from "express";
-import { AppError } from "../utils/AppError";
+
+// Custom Error Class
+export class AppError extends Error {
+  statusCode: number;
+  status: string;
+  isOperational: boolean;
+  path?: string;
+  value?: any;
+  code?: number;
+  keyValue?: any;
+  errors?: any;
+
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.statusCode = statusCode;
+    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
+    this.isOperational = true;
+
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
 
 // Helper function to send error in development mode
-const sendErrorDev = (err: AppError, res: Response) => {
-  return res.status(err.statusCode).json({
+const sendErrorDev = (err: AppError, res: Response): void => {
+  res.status(err.statusCode).json({
     status: err.status,
     message: err.message,
     error: err,
@@ -12,69 +33,84 @@ const sendErrorDev = (err: AppError, res: Response) => {
 };
 
 // Helper function to send error in production mode
-const sendErrorProd = (err: AppError, res: Response) => {
-  // Operational, trusted error: send message to the client
+const sendErrorProd = (err: AppError, res: Response): void => {
+  // Operational, trusted error: send message to client
   if (err.isOperational) {
-    return res.status(err.statusCode).json({
+    res.status(err.statusCode).json({
       status: err.status,
       message: err.message,
     });
+    return;
   }
 
-  // Programming or other unknown errors: don't leak details
-  console.error("ERROR 💥", err);
-  return res.status(500).json({
-    status: "error",
-    message: "Something went very wrong!",
+  // Programming or other unknown error: don't leak error details
+  console.error('ERROR 💥', err);
+  res.status(500).json({
+    status: 'error',
+    message: 'Something went wrong!',
   });
 };
 
-// Custom error handler for different cases
+// Handle Mongoose CastError
+const handleCastErrorDB = (err: any): AppError => {
+  const message = `Invalid ${err.path}: ${err.value}`;
+  return new AppError(message, 400);
+};
+
+// Handle Mongoose Validation Error
+const handleValidationErrorDB = (err: any): AppError => {
+  const errors = Object.values(err.errors).map((el: any) => el.message);
+  const message = `Invalid input data. ${errors.join('. ')}`;
+  return new AppError(message, 400);
+};
+
+// Handle Mongoose Duplicate Fields
+const handleDuplicateFieldsDB = (err: any): AppError => {
+  const value = Object.values(err.keyValue).join(', ');
+  const message = `Duplicate field value: ${value}. Please use another value!`;
+  return new AppError(message, 400);
+};
+
+// Handle JWT Error
+const handleJWTError = (): AppError => {
+  return new AppError('Invalid token. Please log in again!', 401);
+};
+
+// Handle JWT Expired Error
+const handleJWTExpiredError = (): AppError => {
+  return new AppError('Your token has expired! Please log in again.', 401);
+};
+
+// Global Error Handler Middleware
 export const globalErrorHandler = (
-  err: AppError,
+  err: any,
+  req: Request,
   res: Response,
-) => {
+  next: NextFunction
+): void => {
   err.statusCode = err.statusCode || 500;
-  err.status = err.status || "error";
+  err.status = err.status || 'error';
 
-  // CastError: Mongoose bad ObjectId
-  if (err.name === "CastError") {
-    err = new AppError(`Invalid ${err.path}: ${err.value}`, 400);
-  }
-
-  // ValidationError: Mongoose validation error
-  if (err.name === "ValidationError") {
-    const errors = Object.values(err.errors).map((el: any) => el.message);
-    err = new AppError(`Invalid input data. ${errors.join(". ")}`, 400);
-  }
-
-  // Duplicate fields error from MongoDB
-  if (err.code && err.code === 11000) {
-    const value = Object.values(err.keyValue).join(", ");
-    err = new AppError(
-      `Duplicate field value: ${value}. Please use another value!`,
-      400
-    );
-  }
-
-  // JWT errors
-  if (err.name === "JsonWebTokenError") {
-    err = new AppError("Invalid token. Please log in again!", 401);
-  }
-  if (err.name === "TokenExpiredError") {
-    err = new AppError("Your token has expired! Please log in again.", 401);
-  }
-
-  res.status(err.statusCode).json({
-    status: err.status,
-    success: false,
-    message: err.message,
-    stack: err.stack,
-  });
-
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
   } else {
-    sendErrorProd(err, res);
+    let error = { ...err };
+    error.message = err.message;
+
+    // Handle different types of errors
+    if (err.name === 'CastError') error = handleCastErrorDB(err);
+    if (err.name === 'ValidationError') error = handleValidationErrorDB(err);
+    if (err.code === 11000) error = handleDuplicateFieldsDB(err);
+    if (err.name === 'JsonWebTokenError') error = handleJWTError();
+    if (err.name === 'TokenExpiredError') error = handleJWTExpiredError();
+
+    sendErrorProd(error, res);
   }
+};
+
+// Async Error Handler Wrapper
+export const catchAsync = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    fn(req, res, next).catch(next);
+  };
 };

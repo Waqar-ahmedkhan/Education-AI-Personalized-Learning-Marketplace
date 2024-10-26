@@ -12,8 +12,6 @@ interface EmailOptions {
   data: { [key: string]: any };
 }
 
-console.log(`Using SMTP_MAIL: ${process.env.SMTP_MAIL}`);
-
 
 const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {

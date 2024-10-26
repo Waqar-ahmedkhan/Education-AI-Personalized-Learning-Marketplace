@@ -18,7 +18,6 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const ejs_1 = __importDefault(require("ejs"));
 const path_1 = __importDefault(require("path"));
 dotenv_1.default.config();
-console.log(`Using SMTP_MAIL: ${process.env.SMTP_MAIL}`);
 const sendEmail = (options) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const transporter = nodemailer_1.default.createTransport({

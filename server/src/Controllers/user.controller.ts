@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { CatchAsyncError } from "../middlewares/CatchAsyncError";
-import UserModel, { IUser, IUserInput } from "../models/user.model";
+import UserModel  from "../models/user.model";
 import { AppError } from "../utils/AppError";
 import jwt, { Secret } from "jsonwebtoken";
 import sendEmail from "../utils/Sendemail";
@@ -12,7 +12,7 @@ interface IRegistrationBody {
   avatar?: {
     public_id: string;
     url: string;
-  };
+  }; 
 }
 
 interface IActivationToken {
@@ -23,17 +23,9 @@ interface IActivationToken {
 interface IActivationRequest {
   activation_token: string;
   activation_code: string;
-  name: string;
-  email: string;
-  password: string;
 }
 
-interface IActivationPayload {
-  email: string;
-  activationCode: string;
-}
-
-export const createActivationToken = (user: IUserInput): IActivationToken => {
+export const createActivationToken = (user: IRegistrationBody): IActivationToken => {
   if (!process.env.ACTIVATION_SECRET) {
     throw new Error("ACTIVATION_SECRET is not defined in environment variables");
   }
@@ -42,7 +34,11 @@ export const createActivationToken = (user: IUserInput): IActivationToken => {
 
   const token = jwt.sign(
     {
-      email: user.email,
+      user: {
+        name: user.name,
+        email: user.email,
+        password: user.password
+      },
       activationCode,
     },
     process.env.ACTIVATION_SECRET as Secret,
@@ -59,8 +55,17 @@ export const registerUser = CatchAsyncError(
 
       // Validate required fields
       if (!email || !password || !name) {
-        return next(new AppError("Please provide all required fields", 400));
+        return next(
+          new AppError("Validation failed", 400, {
+            errors: {
+              email: !email ? "Email is required" : undefined,
+              password: !password ? "Password is required" : undefined,
+              name: !name ? "Name is required" : undefined,
+            },
+          })
+        );
       }
+      
 
       // Check email format
       const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
@@ -71,11 +76,24 @@ export const registerUser = CatchAsyncError(
       // Check if email exists
       const existingUser = await UserModel.findOne({ email });
       if (existingUser) {
-        return next(new AppError("Email already exists", 400));
-      }
+        res.json({
+          status: "400",
+          message: "Email already exists",
+          path: "email",
+          value: req.body.email
+        })
+        return next(
+          new AppError("Email already exists", 400, {
+            path: "email",
+            value: req.body.email,
+          })
+        );
 
+        
+      }
+      
       // Create user input object
-      const userInput: IUserInput = {
+      const userInput: IRegistrationBody = {
         name,
         email,
         password,
@@ -131,23 +149,20 @@ export const registerUser = CatchAsyncError(
 export const activateUser = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { activation_token, activation_code, name, email, password } = 
-        req.body as IActivationRequest;
+      const { activation_token, activation_code } = req.body as IActivationRequest;
 
       // Verify the activation token
       const decoded = jwt.verify(
         activation_token,
         process.env.ACTIVATION_SECRET as Secret
-      ) as IActivationPayload;
+      ) as { user: IRegistrationBody; activationCode: string };
 
+      // Verify activation code
       if (decoded.activationCode !== activation_code) {
         return next(new AppError("Invalid activation code", 400));
       }
 
-      // Verify the email matches the one in the token
-      if (decoded.email !== email) {
-        return next(new AppError("Email mismatch", 400));
-      }
+      const { email, name, password } = decoded.user;
 
       // Check if user already exists
       const existingUser = await UserModel.findOne({ email });

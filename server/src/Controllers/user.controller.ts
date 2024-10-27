@@ -214,18 +214,18 @@ export const UserLogin = CatchAsyncError(async(req: Request, res: Response, next
   const { email, password} = req.body as loginType
   
   if(!email || !password) {
-    next( new AppError("Enter email and password  ", 400) );
+  return   next( new AppError("Enter email and password  ", 400) );
   }
   
 const   user:IUserInput = await UserModel.findOne({email}).select("+password");
     if (!user){
-      next(new AppError("enter a correct email and password", 400))
+     return  next(new AppError("enter a correct email and password", 400))
     
     }
 
     const isPassworfMatch = await user?.comparePassword(password);
   if(!isPassworfMatch){
-    next(new AppError("enter a correct email and password", 400));
+   return  next(new AppError("enter a correct email and password", 400));
   }
 
   sendToken(user, 200, res)

@@ -2,7 +2,7 @@ import { createClient } from "redis";
 require("dotenv").config();
 
 // Create a Redis client
-const client = createClient({
+export const client = createClient({
   url: process.env.REDIS_URL,
 });
 

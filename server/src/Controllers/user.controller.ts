@@ -4,6 +4,8 @@ import UserModel  from "../models/user.model";
 import { AppError } from "../utils/AppError";
 import jwt, { Secret } from "jsonwebtoken";
 import sendEmail from "../utils/Sendemail";
+import { sendToken } from "../utils/jwt";
+import { IUserInput } from "../models/user.model";
 
 interface IRegistrationBody {
   name: string;
@@ -194,3 +196,70 @@ export const activateUser = CatchAsyncError(
     }
   }
 );
+
+// create login 
+
+
+interface loginType {
+   email: string,
+   password: string,
+
+}
+
+export const UserLogin = CatchAsyncError(async(req: Request, res: Response, next: NextFunction)=> {
+  try {
+
+
+
+  const { email, password} = req.body as loginType
+  
+  if(!email || !password) {
+    next( new AppError("Enter email and password  ", 400) );
+  }
+  
+const   user:IUserInput = await UserModel.findOne({email}).select("+password");
+    if (!user){
+      next(new AppError("enter a correct email and password", 400))
+    
+    }
+
+    const isPassworfMatch = await user?.comparePassword(password);
+  if(!isPassworfMatch){
+    next(new AppError("enter a correct email and password", 400));
+  }
+
+  sendToken(user, 200, res)
+
+} catch(err){
+  console.log("error in login correct your error ", err);
+  res.status(400).json({
+    success: false,
+    message: "error in login",
+  })
+}
+
+})
+
+
+export const Userlogout = CatchAsyncError( async (req: Request, res: Response, next: NextFunction) => {
+
+  try {
+    res.cookie("access_token", "", {maxAge:1} )
+    res.cookie("refresh_token", "", {maxAge:1} )
+
+
+    res.status(200).json({
+      success:true,
+      message: "logout successfully "
+    })
+
+  } catch (err){
+    res.status(400).json({
+      success: false,
+      message: "error in logout"
+    })
+  }
+
+})
+
+

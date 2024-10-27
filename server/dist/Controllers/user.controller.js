@@ -12,12 +12,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const Sendemail_1 = __importDefault(require("../utils/Sendemail"));
+const jwt_1 = require("../utils/jwt");
+const RedisConnect_1 = require("../utils/RedisConnect");
 const createActivationToken = (user) => {
     if (!process.env.ACTIVATION_SECRET) {
         throw new Error("ACTIVATION_SECRET is not defined in environment variables");
@@ -27,7 +29,7 @@ const createActivationToken = (user) => {
         user: {
             name: user.name,
             email: user.email,
-            password: user.password
+            password: user.password,
         },
         activationCode,
     }, process.env.ACTIVATION_SECRET, { expiresIn: "5m" });
@@ -59,7 +61,7 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                 status: "400",
                 message: "Email already exists",
                 path: "email",
-                value: req.body.email
+                value: req.body.email,
             });
             return next(new AppError_1.AppError("Email already exists", 400, {
                 path: "email",
@@ -148,5 +150,104 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             return next(new AppError_1.AppError("Activation token has expired", 400));
         }
         return next(new AppError_1.AppError("Failed to activate user", 500));
+    }
+}));
+exports.UserLogin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return next(new AppError_1.AppError("Please enter both email and password", 400));
+        }
+        const user = yield user_model_1.default.findOne({ email }).select("+password");
+        if (!user) {
+            return next(new AppError_1.AppError("Incorrect email or password", 400));
+        }
+        const isPasswordMatch = yield user.comparePassword(password);
+        if (!isPasswordMatch) {
+            return next(new AppError_1.AppError("Incorrect email or password", 400));
+        }
+        // Generate and send tokens
+        (0, jwt_1.sendToken)(user, 200, res);
+    }
+    catch (err) {
+        console.log("Error in login:", err);
+        res.status(400).json({
+            success: false,
+            message: "Error during login",
+        });
+    }
+}));
+// User Logout Controller
+exports.UserLogout = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        res.cookie("access_token", "", { maxAge: 1 });
+        res.cookie("refresh_token", "", { maxAge: 1 });
+        // await client.del(req.user?.id);
+        const userId = String((_a = req.user) === null || _a === void 0 ? void 0 : _a._id);
+        try {
+            yield RedisConnect_1.client.del(userId);
+        }
+        catch (err) {
+            res.status(400).json({
+                success: false,
+                message: "error in redis"
+            });
+        }
+        res.status(200).json({
+            success: true,
+            message: "Logged out successfully",
+        });
+    }
+    catch (err) {
+        res.status(400).json({
+            success: false,
+            message: "Error during logout",
+        });
+    }
+}));
+exports.updateAccessToken = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const refresh_token = req.cookies.refresh_token;
+        if (!refresh_token) {
+            return next(new AppError_1.AppError("Please login again", 401));
+        }
+        // Verify refresh token
+        let decoded;
+        try {
+            decoded = jsonwebtoken_1.default.verify(refresh_token, process.env.REFRESH_TOKEN_SECRET);
+        }
+        catch (error) {
+            if (error.name === "TokenExpiredError") {
+                return next(new AppError_1.AppError("Refresh token expired, please login again", 401));
+            }
+            return next(new AppError_1.AppError("Invalid refresh token", 401));
+        }
+        // Get user from Redis
+        const session = yield RedisConnect_1.client.get(decoded.id);
+        if (!session) {
+            return next(new AppError_1.AppError("Please login again", 401));
+        }
+        const user = JSON.parse(session);
+        // Generate new access token
+        const access_token = jsonwebtoken_1.default.sign({ id: user._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "8m" } // Set according to your environment variable
+        );
+        // Generate new refresh token
+        const new_refresh_token = jsonwebtoken_1.default.sign({ id: user._id }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "4d" } // Set according to your environment variable
+        );
+        // Update session in Redis
+        user.refresh_token = new_refresh_token; // Update refresh token
+        yield RedisConnect_1.client.set(user._id, JSON.stringify(user));
+        // Set new cookies
+        res.cookie("access_token", access_token, jwt_1.accessTokenOptions);
+        res.cookie("refresh_token", new_refresh_token, jwt_1.refreshTokenOptions);
+        res.status(200).json({
+            status: "success",
+            access_token,
+        });
+    }
+    catch (error) {
+        console.error("Token refresh error:", error);
+        return next(new AppError_1.AppError("Error refreshing access token", 500));
     }
 }));

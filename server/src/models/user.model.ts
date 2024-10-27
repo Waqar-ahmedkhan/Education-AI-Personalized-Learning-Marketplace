@@ -1,7 +1,7 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
 import bcrypt from "bcryptjs";
-require("dotenv").config();
 import jwt from "jsonwebtoken";
+require("dotenv").config();
 
 // Base interface for user input
 export interface IUserInput extends Document {
@@ -20,8 +20,7 @@ export interface IUserInput extends Document {
   SignRefreshToken: () => string;
 }
 
-// Interface for user document with additional fields
-
+// User Schema definition
 const userSchema = new Schema<IUserInput>(
   {
     name: {
@@ -68,19 +67,24 @@ const userSchema = new Schema<IUserInput>(
   }
 );
 
-userSchema.methods.SignAccessToken = async function () {
+// Access Token Signing
+userSchema.methods.SignAccessToken = function () {
   return jwt.sign(
     { id: this._id },
-    process.env.ACCESS_TOKEN_SECRET as string || "",
-  );
-}
-
-userSchema.methods.SignRefreshToken = async function () {
-  return jwt.sign(
-    { id: this._id },
-    process.env.REFRESH_TOKEN_SECRET as string || "",
+    process.env.ACCESS_TOKEN_SECRET as string,
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRE || "15m" }
   );
 };
+
+// Refresh Token Signing
+userSchema.methods.SignRefreshToken = function () {
+  return jwt.sign(
+    { id: this._id },
+    process.env.REFRESH_TOKEN_SECRET as string,
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || "7d" }
+  );
+};
+
 // Hash password before saving
 userSchema.pre<IUserInput>("save", async function (next) {
   if (!this.isModified("password")) {
@@ -94,11 +98,9 @@ userSchema.pre<IUserInput>("save", async function (next) {
   }
 });
 
-// Method to compare password
-userSchema.methods.comparePassword = async function (
-  password: string
-): Promise<boolean> {
-  return await bcrypt.compare(password, this.password);
+// Method to compare passwords
+userSchema.methods.comparePassword = async function (password: string): Promise<boolean> {
+  return bcrypt.compare(password, this.password);
 };
 
 const UserModel: Model<IUserInput> = mongoose.model("User", userSchema);

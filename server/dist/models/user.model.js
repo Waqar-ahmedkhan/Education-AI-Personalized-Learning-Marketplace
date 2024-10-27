@@ -37,6 +37,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+require("dotenv").config();
+// User Schema definition
 const userSchema = new mongoose_1.Schema({
     name: {
         type: String,
@@ -77,8 +80,16 @@ const userSchema = new mongoose_1.Schema({
         },
     ],
 }, {
-    timestamps: true
+    timestamps: true,
 });
+// Access Token Signing
+userSchema.methods.SignAccessToken = function () {
+    return jsonwebtoken_1.default.sign({ id: this._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: process.env.ACCESS_TOKEN_EXPIRE || "15m" });
+};
+// Refresh Token Signing
+userSchema.methods.SignRefreshToken = function () {
+    return jsonwebtoken_1.default.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || "7d" });
+};
 // Hash password before saving
 userSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -94,10 +105,10 @@ userSchema.pre("save", function (next) {
         }
     });
 });
-// Method to compare password
+// Method to compare passwords
 userSchema.methods.comparePassword = function (password) {
     return __awaiter(this, void 0, void 0, function* () {
-        return yield bcryptjs_1.default.compare(password, this.password);
+        return bcryptjs_1.default.compare(password, this.password);
     });
 };
 const UserModel = mongoose_1.default.model("User", userSchema);

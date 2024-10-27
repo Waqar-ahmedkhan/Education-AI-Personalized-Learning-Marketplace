@@ -5,7 +5,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const user_controller_1 = require("../Controllers/user.controller");
+const auth_1 = require("../middlewares/auth");
 const UserRoute = express_1.default.Router();
-UserRoute.post('/registration', user_controller_1.registerUser);
-UserRoute.post('/active-user', user_controller_1.activateUser);
+UserRoute.post("/registration", user_controller_1.registerUser);
+UserRoute.post("/active-user", user_controller_1.activateUser);
+UserRoute.post("/login-user", user_controller_1.UserLogin);
+UserRoute.get("/logout-user", auth_1.isAuthenticated, user_controller_1.UserLogout);
+UserRoute.get("/refresh", user_controller_1.updateAccessToken);
 exports.default = UserRoute;

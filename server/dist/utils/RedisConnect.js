@@ -9,20 +9,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.connectRedis = void 0;
+exports.connectRedis = exports.client = void 0;
 const redis_1 = require("redis");
 require("dotenv").config();
 // Create a Redis client
-const client = (0, redis_1.createClient)({
+exports.client = (0, redis_1.createClient)({
     url: process.env.REDIS_URL,
 });
-client.on("error", (err) => {
+exports.client.on("error", (err) => {
     console.log("Redis Client Error:", err);
 });
 // Connect to Redis
 const connectRedis = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield client.connect();
+        yield exports.client.connect();
         console.log("Redis connected successfully");
     }
     catch (error) {

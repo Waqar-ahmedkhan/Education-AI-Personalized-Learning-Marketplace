@@ -1,7 +1,9 @@
 import express from "express";
 import {
   activateUser,
+  getUserInformatin,
   registerUser,
+  socialAuth,
   updateAccessToken,
   UserLogin,
   UserLogout,
@@ -15,5 +17,7 @@ UserRoute.post("/active-user", activateUser);
 UserRoute.post("/login-user", UserLogin);
 UserRoute.get("/logout-user", isAuthenticated, UserLogout)
 UserRoute.get("/refresh", updateAccessToken)
+UserRoute.get("/me", isAuthenticated, getUserInformatin)
+UserRoute.post("/soical-auth",  socialAuth);
 
 export default UserRoute;

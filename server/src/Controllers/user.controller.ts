@@ -6,6 +6,7 @@ import jwt, { JwtPayload, Secret } from "jsonwebtoken";
 import sendEmail from "../utils/Sendemail";
 import {accessTokenOptions, refreshTokenOptions, sendToken } from "../utils/jwt";
 import { client } from "../utils/RedisConnect";
+import { getUserbyId } from "../services/user.services";
 
 interface IRegistrationBody {
   name: string;
@@ -332,3 +333,43 @@ export const updateAccessToken = CatchAsyncError(
   }
 );
 
+
+export const getUserInformatin = async(req:Request, res:Response, next: NextFunction)=> {
+  try {
+    const userId = String(req.user?._id);
+    getUserbyId(userId, res);
+  } catch(err){
+    console.log("Error in get user information:", err);
+    res.status(400).json({
+      success: false,
+      message: "Error during get user information",
+    });
+  }
+
+
+}
+
+interface ISoicalAuth {
+   name: string,
+   email: string,
+   avatar: string,
+}
+
+export const socialAuth = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
+  try{
+    const { email,  name,  avatar } = req.body as ISoicalAuth;
+    if(!email ||!name ||! avatar ){
+      return next(new AppError("Please provide all required fields", 400));
+    }
+
+    const user = await UserModel.create({ email, name,avatar,});
+    if(!user){
+      const newUser =await UserModel.create({ email, name, avatar})  
+      sendToken(newUser, 200, res)
+    } else {
+      sendToken(user, 200, res )
+    }
+  }  catch(err){
+    console.log("error is not gooded")
+  }
+})

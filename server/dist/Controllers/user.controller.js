@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -20,6 +20,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const Sendemail_1 = __importDefault(require("../utils/Sendemail"));
 const jwt_1 = require("../utils/jwt");
 const RedisConnect_1 = require("../utils/RedisConnect");
+const user_services_1 = require("../services/user.services");
 const createActivationToken = (user) => {
     if (!process.env.ACTIVATION_SECRET) {
         throw new Error("ACTIVATION_SECRET is not defined in environment variables");
@@ -249,5 +250,39 @@ exports.updateAccessToken = (0, CatchAsyncError_1.CatchAsyncError)((req, res, ne
     catch (error) {
         console.error("Token refresh error:", error);
         return next(new AppError_1.AppError("Error refreshing access token", 500));
+    }
+}));
+const getUserInformatin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const userId = String((_a = req.user) === null || _a === void 0 ? void 0 : _a._id);
+        (0, user_services_1.getUserbyId)(userId, res);
+    }
+    catch (err) {
+        console.log("Error in get user information:", err);
+        res.status(400).json({
+            success: false,
+            message: "Error during get user information",
+        });
+    }
+});
+exports.getUserInformatin = getUserInformatin;
+exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, name, avatar } = req.body;
+        if (!email || !name || !avatar) {
+            return next(new AppError_1.AppError("Please provide all required fields", 400));
+        }
+        const user = yield user_model_1.default.create({ email, name, avatar, });
+        if (!user) {
+            const newUser = yield user_model_1.default.create({ email, name, avatar });
+            (0, jwt_1.sendToken)(newUser, 200, res);
+        }
+        else {
+            (0, jwt_1.sendToken)(user, 200, res);
+        }
+    }
+    catch (err) {
+        console.log("error is not gooded");
     }
 }));

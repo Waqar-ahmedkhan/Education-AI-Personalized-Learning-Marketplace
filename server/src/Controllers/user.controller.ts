@@ -373,3 +373,23 @@ export const socialAuth = CatchAsyncError(async (req: Request, res: Response, ne
     console.log("error is not gooded")
   }
 })
+
+
+interface IUpdateUserInterface {
+  name: string;
+  email: string;
+}
+
+export const UpdateUserInformation = CatchAsyncError( async (req: Request, res: Response)=> {
+        try {
+            
+          const { name, email } = req.body as IUpdateUserInterface
+          const userId = req.user?._id;
+          const user = await UserModel.findById(userId);
+
+          
+
+        }  catch(err){
+          console.log(err);
+        }    
+})

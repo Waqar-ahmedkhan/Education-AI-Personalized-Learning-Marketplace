@@ -380,14 +380,36 @@ interface IUpdateUserInterface {
   email: string;
 }
 
-export const UpdateUserInformation = CatchAsyncError( async (req: Request, res: Response)=> {
+export const UpdateUserInformation = CatchAsyncError( async (req: Request, res: Response, next: NextFunction)=> {
         try {
             
           const { name, email } = req.body as IUpdateUserInterface
           const userId = req.user?._id;
           const user = await UserModel.findById(userId);
 
-          
+          if(email && user){
+          const  isEmailExisted = await UserModel.findOne({ email });
+          if(isEmailExisted){
+          return   next(new AppError("email is already existed", 400))
+
+          }
+
+          user.email = email;
+          }
+
+          if(name && user){
+            user.name = name;
+          }
+
+          await user?.save(); 
+
+
+          await client.set(userId, JSON.stringify(user));
+
+          res.status(201).json({
+            success: true,
+            user,
+          })
 
         }  catch(err){
           console.log(err);

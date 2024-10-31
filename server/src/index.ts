@@ -54,3 +54,6 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
+app.get("/hello-world", ()=>  {
+  console.log("hello world")
+})

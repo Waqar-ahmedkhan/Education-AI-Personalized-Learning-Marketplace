@@ -5,6 +5,7 @@ import {
   registerUser,
   socialAuth,
   updateAccessToken,
+  UpdateUserInformation,
   UserLogin,
   UserLogout,
 } from "../Controllers/user.controller";
@@ -19,5 +20,6 @@ UserRoute.get("/logout-user", isAuthenticated, UserLogout)
 UserRoute.get("/refresh", updateAccessToken)
 UserRoute.get("/me", isAuthenticated, getUserInformatin)
 UserRoute.post("/soical-auth",  socialAuth);
+UserRoute.put("/update-user-info",isAuthenticated, UpdateUserInformation);
 
 export default UserRoute;

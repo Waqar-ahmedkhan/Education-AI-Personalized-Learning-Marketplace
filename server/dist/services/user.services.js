@@ -8,17 +8,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getUserbyId = void 0;
-const user_model_1 = __importDefault(require("../models/user.model"));
+const RedisConnect_1 = require("../utils/RedisConnect");
 const getUserbyId = (id, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield user_model_1.default.findById(id);
-    res.status(201).json({
-        success: true,
-        user
-    });
+    const userJson = yield RedisConnect_1.client.get(id);
+    if (userJson) {
+        const user = JSON.parse(userJson);
+        res.status(201).json({
+            success: true,
+            user
+        });
+    }
 });
 exports.getUserbyId = getUserbyId;

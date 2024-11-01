@@ -318,6 +318,8 @@ export const updateAccessToken = CatchAsyncError(
       user.refresh_token = new_refresh_token; // Update refresh token
       await client.set(user._id, JSON.stringify(user));
 
+      req.user = user;
+
       // Set new cookies
       res.cookie("access_token", access_token, accessTokenOptions);
       res.cookie("refresh_token", new_refresh_token, refreshTokenOptions);
@@ -404,7 +406,7 @@ export const UpdateUserInformation = CatchAsyncError( async (req: Request, res: 
           await user?.save(); 
 
 
-          await client.set(userId, JSON.stringify(user));
+        await  client.set(String(userId), JSON.stringify(user));
 
           res.status(201).json({
             success: true,

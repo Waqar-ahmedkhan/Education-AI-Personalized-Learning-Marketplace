@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -239,6 +239,7 @@ exports.updateAccessToken = (0, CatchAsyncError_1.CatchAsyncError)((req, res, ne
         // Update session in Redis
         user.refresh_token = new_refresh_token; // Update refresh token
         yield RedisConnect_1.client.set(user._id, JSON.stringify(user));
+        req.user = user;
         // Set new cookies
         res.cookie("access_token", access_token, jwt_1.accessTokenOptions);
         res.cookie("refresh_token", new_refresh_token, jwt_1.refreshTokenOptions);
@@ -284,5 +285,32 @@ exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
     }
     catch (err) {
         console.log("error is not gooded");
+    }
+}));
+exports.UpdateUserInformation = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { name, email } = req.body;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const user = yield user_model_1.default.findById(userId);
+        if (email && user) {
+            const isEmailExisted = yield user_model_1.default.findOne({ email });
+            if (isEmailExisted) {
+                return next(new AppError_1.AppError("email is already existed", 400));
+            }
+            user.email = email;
+        }
+        if (name && user) {
+            user.name = name;
+        }
+        yield (user === null || user === void 0 ? void 0 : user.save());
+        yield RedisConnect_1.client.set(String(userId), JSON.stringify(user));
+        res.status(201).json({
+            success: true,
+            user,
+        });
+    }
+    catch (err) {
+        console.log(err);
     }
 }));

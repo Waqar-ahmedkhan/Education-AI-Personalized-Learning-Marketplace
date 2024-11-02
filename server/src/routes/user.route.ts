@@ -5,6 +5,7 @@ import {
   registerUser,
   socialAuth,
   updateAccessToken,
+  UpdatePassword,
   UpdateUserInformation,
   UserLogin,
   UserLogout,
@@ -21,5 +22,5 @@ UserRoute.get("/refresh", updateAccessToken)
 UserRoute.get("/me", isAuthenticated, getUserInformatin)
 UserRoute.post("/soical-auth",  socialAuth);
 UserRoute.put("/update-user-info",isAuthenticated, UpdateUserInformation);
-
+UserRoute.put("/update-password",isAuthenticated, UpdatePassword);
 export default UserRoute;

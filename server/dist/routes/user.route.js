@@ -15,4 +15,5 @@ UserRoute.get("/refresh", user_controller_1.updateAccessToken);
 UserRoute.get("/me", auth_1.isAuthenticated, user_controller_1.getUserInformatin);
 UserRoute.post("/soical-auth", user_controller_1.socialAuth);
 UserRoute.put("/update-user-info", auth_1.isAuthenticated, user_controller_1.UpdateUserInformation);
+UserRoute.put("/update-password", auth_1.isAuthenticated, user_controller_1.UpdatePassword);
 exports.default = UserRoute;

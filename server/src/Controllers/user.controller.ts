@@ -4,9 +4,14 @@ import UserModel from "../models/user.model";
 import { AppError } from "../utils/AppError";
 import jwt, { JwtPayload, Secret } from "jsonwebtoken";
 import sendEmail from "../utils/Sendemail";
-import {accessTokenOptions, refreshTokenOptions, sendToken } from "../utils/jwt";
+import {
+  accessTokenOptions,
+  refreshTokenOptions,
+  sendToken,
+} from "../utils/jwt";
 import { client } from "../utils/RedisConnect";
 import { getUserbyId } from "../services/user.services";
+import  cloudinary  from "cloudinary"
 
 interface IRegistrationBody {
   name: string;
@@ -247,13 +252,13 @@ export const UserLogout = CatchAsyncError(
 
       // await client.del(req.user?.id);
       const userId = String(req.user?._id);
-      try{
-          await client.del(userId)
-      } catch(err){
+      try {
+        await client.del(userId);
+      } catch (err) {
         res.status(400).json({
-           success: false,
-           message: "error in redis"
-        })
+          success: false,
+          message: "error in redis",
+        });
       }
 
       res.status(200).json({
@@ -287,7 +292,9 @@ export const updateAccessToken = CatchAsyncError(
         ) as JwtPayload;
       } catch (error: any) {
         if (error.name === "TokenExpiredError") {
-          return next(new AppError("Refresh token expired, please login again", 401));
+          return next(
+            new AppError("Refresh token expired, please login again", 401)
+          );
         }
         return next(new AppError("Invalid refresh token", 401));
       }
@@ -335,85 +342,156 @@ export const updateAccessToken = CatchAsyncError(
   }
 );
 
-
-export const getUserInformatin = async(req:Request, res:Response, next: NextFunction)=> {
+export const getUserInformatin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = String(req.user?._id);
     getUserbyId(userId, res);
-  } catch(err){
+  } catch (err) {
     console.log("Error in get user information:", err);
     res.status(400).json({
       success: false,
       message: "Error during get user information",
     });
   }
-
-
-}
+};
 
 interface ISoicalAuth {
-   name: string,
-   email: string,
-   avatar: string,
+  name: string;
+  email: string;
+  avatar: string;
 }
 
-export const socialAuth = CatchAsyncError(async (req: Request, res: Response, next: NextFunction) => {
-  try{
-    const { email,  name,  avatar } = req.body as ISoicalAuth;
-    if(!email ||!name ||! avatar ){
-      return next(new AppError("Please provide all required fields", 400));
-    }
+export const socialAuth = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, name, avatar } = req.body as ISoicalAuth;
+      if (!email || !name || !avatar) {
+        return next(new AppError("Please provide all required fields", 400));
+      }
 
-    const user = await UserModel.create({ email, name,avatar,});
-    if(!user){
-      const newUser =await UserModel.create({ email, name, avatar})  
-      sendToken(newUser, 200, res)
-    } else {
-      sendToken(user, 200, res )
+      const user = await UserModel.create({ email, name, avatar });
+      if (!user) {
+        const newUser = await UserModel.create({ email, name, avatar });
+        sendToken(newUser, 200, res);
+      } else {
+        sendToken(user, 200, res);
+      }
+    } catch (err) {
+      console.log("error is not gooded");
     }
-  }  catch(err){
-    console.log("error is not gooded")
   }
-})
-
-
+);
 interface IUpdateUserInterface {
   name: string;
   email: string;
 }
 
-export const UpdateUserInformation = CatchAsyncError( async (req: Request, res: Response, next: NextFunction)=> {
-        try {
-            
-          const { name, email } = req.body as IUpdateUserInterface
-          const userId = req.user?._id;
-          const user = await UserModel.findById(userId);
+export const UpdateUserInformation = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { name, email } = req.body as IUpdateUserInterface;
+      const userId = String(req.user?._id); // Ensure userId is a string
+      const user = await UserModel.findById(userId);
 
-          if(email && user){
-          const  isEmailExisted = await UserModel.findOne({ email });
-          if(isEmailExisted){
-          return   next(new AppError("email is already existed", 400))
+      if (!user) {
+        return next(new AppError("User not found", 404));
+      }
 
-          }
+      // Check if email already exists
+      if (email) {
+        const isEmailExisted = await UserModel.findOne({ email });
+        if (isEmailExisted) {
+          return next(new AppError("Email is already existed", 400));
+        }
+        user.email = email;
+      }
 
-          user.email = email;
-          }
+      if (name) {
+        user.name = name;
+      }
 
-          if(name && user){
-            user.name = name;
-          }
+      await user.save();
 
-          await user?.save(); 
+      // Store updated user data in Redis
+      await client.set(userId, JSON.stringify(user));
 
+      res.status(201).json({
+        success: true,
+        user,
+      });
+    } catch (err: any) {
+      console.log(err.message, "error in UpdateUserinformation ");
+      next(new AppError("error in updateUserInformatin", 400));
+    }
+  }
+);
 
-        await  client.set(String(userId), JSON.stringify(user));
+//   updatePassword
 
-          res.status(201).json({
-            success: true,
-            user,
-          })
+interface IUpdatePasswordInterface {
+  currentPassword: string;
+  newPassword: string;
+}
 
-        }  catch(err){
-          console.log(err);
-        }    
+export const UpdatePassword = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { currentPassword, newPassword } =
+        req.body as IUpdatePasswordInterface;
+      if (!currentPassword || !newPassword) {
+      }
+
+      const user = await UserModel.findById(req.user?._id).select("password");
+      if (!user) {
+        return next(new AppError("User not found", 404));
+      }
+
+      const isPasswordMatch = await user.comparePassword(currentPassword);
+      if (!isPasswordMatch) {
+        return next(new AppError("Current password is incorrect", 400));
+      }
+
+      user.password = newPassword;
+
+      await user.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Password updated successfully",
+      });
+    } catch (err) {
+      console.log(err);
+      res.status(400).json({
+        success: false,
+        message: "Error during password update",
+      });
+    }
+  }
+);
+
+interface IUpateProfilePicture {
+  avatar: {
+  public_id : string,
+  url : string
+  }
+}
+
+export const UpdateProfilePicture = CatchAsyncError(async(req:Request, res:Response, next:NextFunction)=> {
+    try{
+      const { avatar } = req.body as IUpateProfilePicture;
+      const user = req.user;
+      if(user?.avatar.public_id){
+        await cloudinary.v2.uploader.destroy(user?.avatar.public_id)
+
+      } else {
+        await cloudinary.v2.uploader.upload(String(avatar))
+      }
+
+    } catch(err){
+      next(new AppError("error in update file picture ", 400))
+    }
 })

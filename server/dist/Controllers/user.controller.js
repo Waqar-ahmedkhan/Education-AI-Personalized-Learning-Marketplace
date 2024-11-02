@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -192,7 +192,7 @@ exports.UserLogout = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
         catch (err) {
             res.status(400).json({
                 success: false,
-                message: "error in redis"
+                message: "error in redis",
             });
         }
         res.status(200).json({
@@ -274,7 +274,7 @@ exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
         if (!email || !name || !avatar) {
             return next(new AppError_1.AppError("Please provide all required fields", 400));
         }
-        const user = yield user_model_1.default.create({ email, name, avatar, });
+        const user = yield user_model_1.default.create({ email, name, avatar });
         if (!user) {
             const newUser = yield user_model_1.default.create({ email, name, avatar });
             (0, jwt_1.sendToken)(newUser, 200, res);
@@ -291,26 +291,61 @@ exports.UpdateUserInformation = (0, CatchAsyncError_1.CatchAsyncError)((req, res
     var _a;
     try {
         const { name, email } = req.body;
-        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const userId = String((_a = req.user) === null || _a === void 0 ? void 0 : _a._id); // Ensure userId is a string
         const user = yield user_model_1.default.findById(userId);
-        if (email && user) {
+        if (!user) {
+            return next(new AppError_1.AppError("User not found", 404));
+        }
+        // Check if email already exists
+        if (email) {
             const isEmailExisted = yield user_model_1.default.findOne({ email });
             if (isEmailExisted) {
-                return next(new AppError_1.AppError("email is already existed", 400));
+                return next(new AppError_1.AppError("Email is already existed", 400));
             }
             user.email = email;
         }
-        if (name && user) {
+        if (name) {
             user.name = name;
         }
-        yield (user === null || user === void 0 ? void 0 : user.save());
-        yield RedisConnect_1.client.set(String(userId), JSON.stringify(user));
+        yield user.save();
+        // Store updated user data in Redis
+        yield RedisConnect_1.client.set(userId, JSON.stringify(user));
         res.status(201).json({
             success: true,
             user,
         });
     }
     catch (err) {
+        console.log(err.message, "error in UpdateUserinformation ");
+        next(new AppError_1.AppError("error in updateUserInformatin", 400));
+    }
+}));
+exports.UpdatePassword = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+        }
+        const user = yield user_model_1.default.findById((_a = req.user) === null || _a === void 0 ? void 0 : _a._id).select("password");
+        if (!user) {
+            return next(new AppError_1.AppError("User not found", 404));
+        }
+        const isPasswordMatch = yield user.comparePassword(currentPassword);
+        if (!isPasswordMatch) {
+            return next(new AppError_1.AppError("Current password is incorrect", 400));
+        }
+        user.password = newPassword;
+        yield user.save();
+        res.status(200).json({
+            success: true,
+            message: "Password updated successfully",
+        });
+    }
+    catch (err) {
         console.log(err);
+        res.status(400).json({
+            success: false,
+            message: "Error during password update",
+        });
     }
 }));

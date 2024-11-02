@@ -23,7 +23,9 @@ UserRoute.get("/refresh", updateAccessToken)
 UserRoute.get("/me", isAuthenticated, getUserInformatin)
 UserRoute.post("/soical-auth",  socialAuth);
 UserRoute.put("/update-user-info",isAuthenticated, UpdateUserInformation);
-UserRoute.put("/update-password",isAuthenticated, UpdatePassword);
-UserRoute.put("/avatar-upload",isAuthenticated, UpdateProfilePicture);
+
+// there are those routes are which are not tested like for last 4 5 days
+UserRoute.put("/update-password",isAuthenticated, UpdatePassword);// not tested
+UserRoute.put("/avatar-upload",isAuthenticated, UpdateProfilePicture);// not tested
 
 export default UserRoute;

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -21,6 +21,7 @@ const Sendemail_1 = __importDefault(require("../utils/Sendemail"));
 const jwt_1 = require("../utils/jwt");
 const RedisConnect_1 = require("../utils/RedisConnect");
 const user_services_1 = require("../services/user.services");
+const cloudinary_1 = __importDefault(require("cloudinary"));
 const createActivationToken = (user) => {
     if (!process.env.ACTIVATION_SECRET) {
         throw new Error("ACTIVATION_SECRET is not defined in environment variables");
@@ -347,5 +348,37 @@ exports.UpdatePassword = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next)
             success: false,
             message: "Error during password update",
         });
+    }
+}));
+exports.UpdateProfilePicture = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    try {
+        const { avatar } = req.body;
+        const userId = (_a = req === null || req === void 0 ? void 0 : req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const user = yield user_model_1.default.findById(userId);
+        if (avatar && user) {
+            // If the user already has an avatar, delete the old one
+            if ((_b = user.avatar) === null || _b === void 0 ? void 0 : _b.public_id) {
+                yield cloudinary_1.default.v2.uploader.destroy(user.avatar.public_id);
+            }
+            // Upload the new avatar
+            const myCloud = yield cloudinary_1.default.v2.uploader.upload(String(avatar), {
+                folder: "avatars",
+                width: 150,
+            });
+            // Update the user's avatar field
+            user.avatar = {
+                public_id: myCloud.public_id,
+                url: myCloud.secure_url,
+            };
+            // Save user changes to the database
+            yield user.save();
+            // Cache the updated user object
+            yield RedisConnect_1.client.set(String(userId), JSON.stringify(user));
+        }
+        res.status(200).json({ success: true, message: "Profile picture updated successfully", user });
+    }
+    catch (err) {
+        next(new AppError_1.AppError("Error in updating profile picture", 400));
     }
 }));

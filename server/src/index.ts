@@ -5,14 +5,12 @@ import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
 import { AppError } from "./utils/AppError";
 import { globalErrorHandler } from "./middlewares/GlobalErrorhandler";
-import connectDB from "./utils/dbConnect";
 import { connectRedis } from "./utils/RedisConnect";
 import  UserRoute  from "./routes/user.route"
 
 dotenv.config();
 
-const app = express();
-const port = process.env.PORT || 3000;
+export const app = express();
 
 // Middlewares
 app.use(express.json());
@@ -21,7 +19,6 @@ app.use(cors({ origin: process.env.ORIGIN_URL }));
 app.use(cookieParser());
 
 //connectDbs
-connectDB();
 connectRedis();
 
 
@@ -50,7 +47,7 @@ app.all("*", (req: Request, res: Response, next: NextFunction) => {
 
 app.use(globalErrorHandler);
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+// app.listen(port, () => {
+//   console.log(`Server is running on port ${port}`);
+// });
 

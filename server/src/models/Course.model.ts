@@ -106,11 +106,11 @@ const courseSchema = new Schema<ICourse>({
   purchased: { type: Number, default: 0 }
 });
 
-const Course = mongoose.model<ICourse>("Course", courseSchema);
+const CourseModel = mongoose.model<ICourse>("Course", courseSchema);
 
 // const course = await Course.findById(courseId)
 //   .populate('courseData.question')
 //   .populate('reviews.CommentReplies');
 
 
-export default Course;
+export default CourseModel;

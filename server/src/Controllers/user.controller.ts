@@ -486,25 +486,37 @@ export const UpdateProfilePicture = CatchAsyncError(
       const { avatar } = req.body as IUpateProfilePicture;
       const userId = req?.user?._id;
 
-      const user = await UserModel.findById(userId)
+      const user = await UserModel.findById(userId);
 
       if (avatar && user) {
-        if (user?.avatar.public_id) {
-          await cloudinary.v2.uploader.destroy(user?.avatar.public_id);
-        } else {
-          const myCloud = await cloudinary.v2.uploader.upload(String(avatar), {
-            folder: "avatars",
-            width: 150,
-          });
-
-          user.avatar = {
-            public_id: myCloud.public_id,
-            url: myCloud.secure_url,
-          };
+        // If the user already has an avatar, delete the old one
+        if (user.avatar?.public_id) {
+          await cloudinary.v2.uploader.destroy(user.avatar.public_id);
         }
+
+        // Upload the new avatar
+        const myCloud = await cloudinary.v2.uploader.upload(String(avatar), {
+          folder: "avatars",
+          width: 150,
+        });
+
+        // Update the user's avatar field
+        user.avatar = {
+          public_id: myCloud.public_id,
+          url: myCloud.secure_url,
+        };
+
+        // Save user changes to the database
+        await user.save();
+
+        // Cache the updated user object
+        await client.set(String(userId), JSON.stringify(user));
       }
+
+      res.status(200).json({ success: true, message: "Profile picture updated successfully" });
+
     } catch (err) {
-      next(new AppError("error in update file picture ", 400));
+      next(new AppError("Error in updating profile picture", 400));
     }
   }
 );

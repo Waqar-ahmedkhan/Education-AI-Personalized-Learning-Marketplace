@@ -11,7 +11,7 @@ import {
 } from "../utils/jwt";
 import { client } from "../utils/RedisConnect";
 import { getUserbyId } from "../services/user.services";
-import  cloudinary  from "cloudinary"
+import cloudinary from "cloudinary";
 
 interface IRegistrationBody {
   name: string;
@@ -475,23 +475,36 @@ export const UpdatePassword = CatchAsyncError(
 
 interface IUpateProfilePicture {
   avatar: {
-  public_id : string,
-  url : string
-  }
+    public_id: string;
+    url: string;
+  };
 }
 
-export const UpdateProfilePicture = CatchAsyncError(async(req:Request, res:Response, next:NextFunction)=> {
-    try{
+export const UpdateProfilePicture = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
       const { avatar } = req.body as IUpateProfilePicture;
-      const user = req.user;
-      if(user?.avatar.public_id){
-        await cloudinary.v2.uploader.destroy(user?.avatar.public_id)
+      const userId = req?.user?._id;
 
-      } else {
-        await cloudinary.v2.uploader.upload(String(avatar))
+      const user = await UserModel.findById(userId)
+
+      if (avatar && user) {
+        if (user?.avatar.public_id) {
+          await cloudinary.v2.uploader.destroy(user?.avatar.public_id);
+        } else {
+          const myCloud = await cloudinary.v2.uploader.upload(String(avatar), {
+            folder: "avatars",
+            width: 150,
+          });
+
+          user.avatar = {
+            public_id: myCloud.public_id,
+            url: myCloud.secure_url,
+          };
+        }
       }
-
-    } catch(err){
-      next(new AppError("error in update file picture ", 400))
+    } catch (err) {
+      next(new AppError("error in update file picture ", 400));
     }
-})
+  }
+);

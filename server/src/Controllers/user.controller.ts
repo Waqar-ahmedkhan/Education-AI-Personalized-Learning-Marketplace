@@ -513,7 +513,7 @@ export const UpdateProfilePicture = CatchAsyncError(
         await client.set(String(userId), JSON.stringify(user));
       }
 
-      res.status(200).json({ success: true, message: "Profile picture updated successfully" });
+      res.status(200).json({ success: true, message: "Profile picture updated successfully", user });
 
     } catch (err) {
       next(new AppError("Error in updating profile picture", 400));

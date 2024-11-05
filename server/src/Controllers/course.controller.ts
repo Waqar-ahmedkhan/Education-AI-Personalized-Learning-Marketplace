@@ -98,19 +98,21 @@ export const GetSingleCourse = CatchAsyncError(
           });
         
 
+      } else {
+        const course = await CourseModel.findById(courseId).select(
+          "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
+        );
+  
+        if (!course) {
+          return next(new AppError("Course not found", 404));
+        }
+  
+        res.status(200).json({
+          success: true,
+          data: course,
+        });
       }
-      const course = await CourseModel.findById(courseId).select(
-        "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
-      );
-
-      if (!course) {
-        return next(new AppError("Course not found", 404));
-      }
-
-      res.status(200).json({
-        success: true,
-        data: course,
-      });
+     
     } catch (err) {
       console.error(err);
       next(

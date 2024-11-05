@@ -9,7 +9,7 @@ const  courseRouter = express.Router();
 
 courseRouter.post("/upload-course", isAuthenticated, authorizedRoles("admin"), uploadCourse);
 courseRouter.put("/edit-course/:id", isAuthenticated, authorizedRoles("admin"), editCourse);
-courseRouter.get("/get-course/:id", GetSingleCourse);
+courseRouter.get("/get-course/:id",  GetSingleCourse);
 
 
 export default courseRouter;

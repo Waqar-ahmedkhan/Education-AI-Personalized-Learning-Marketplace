@@ -156,9 +156,24 @@ export const getallCourses = CatchAsyncError(
 export const getCoursesbyUser = CatchAsyncError(async (req: Request, res:Response, next: NextFunction)=> {
   try {
 const userCousesList = req.user?.courses
-const userId = req.params.user;
+const courseId = req.params.user;
 const courseExists = userCousesList?.find((course: any)=> {
-  course._id.toString()== course._id
+  course._id.toString()== courseId
+})
+
+ if(!courseExists){
+  return next (new AppError("you are not eligible to access this course ", 404));
+
+ }
+
+
+ const  course = await CourseModel.findById(courseId);
+ const content = course?.courseData
+
+res.status(200).send({
+  success: true,
+  message:"get courses by user"
+
 })
   } catch{
     next( new AppError("error in courses by users ", 400) );

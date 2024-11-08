@@ -153,4 +153,16 @@ export const getallCourses = CatchAsyncError(
   }
 );
 
+export const getCoursesbyUser = CatchAsyncError(async (req: Request, res:Response, next: NextFunction)=> {
+  try {
+const userCousesList = req.user?.courses
+const userId = req.params.user;
+const courseExists = userCousesList?.find((course: any)=> {
+  course._id.toString()== course._id
+})
+  } catch{
+    next( new AppError("error in courses by users ", 400) );
+  }
+})
+
 

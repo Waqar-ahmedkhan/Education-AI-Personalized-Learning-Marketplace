@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 // Define the IComment interface
 interface IComment extends Document {
-  user: object;
+  user: IUserInput;
   question: string;
   questionReplies: IComment[];
 }

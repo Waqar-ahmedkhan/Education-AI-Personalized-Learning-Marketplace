@@ -227,38 +227,51 @@ export const addQuestion = CatchAsyncError(
   }
 );
 
-
-interface IAddAnswerData{
- answer: string,
- courseId: string,
- contentId: string,
- questionId: string,
-
+interface IAddAnswerData {
+  answer: string;
+  courseId: string;
+  contentId: string;
+  questionId: string;
 }
 
-export const addAnswer = CatchAsyncError (async (req:Request, res:Response, next: NextFunction)=> {
-  try {
-    const { answer, courseId, contentId, questionId}: IAddAnswerData = req.body;
+export const addAnswer = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { answer, courseId, contentId, questionId }: IAddAnswerData =
+        req.body;
 
-    const course = await CourseModel.findById(courseId);
-    if (!mongoose.Types.ObjectId.isValid(courseId)) {
-      return next(new AppError("invalid content id ", 400));
+      const course = await CourseModel.findById(courseId);
+      if (!mongoose.Types.ObjectId.isValid(courseId)) {
+        return next(new AppError("invalid content id ", 400));
+      }
+
+      const courseContent = course?.courseData?.find((item: any) => {
+        item._id.equals(contentId);
+      });
+
+      if (!courseContent) {
+        return next(new AppError("invalid content id", 400));
+      }
+
+      const question = courseContent?.question?.find((item: any) => {
+        item._id.equals(questionId);
+      });
+
+      if (!question) {
+        return next(new AppError("unvalid question id", 400));
+      }
+
+      const newAnswer: any = {
+        user: req?.user,
+        answer,
+      }
+
+      question.questionReplies.push(newAnswer);
+
+      await course?.save();
+
+    } catch (err) {
+      next(new AppError("error in answering question", 400));
     }
-
-    const courseContent = course?.courseData?.find((item: any)=> {
-    item._id.equals(contentId);
-    })
-
-   if(course){
-    
-   }
-
-
-  }catch(err){
-    next(new AppError("error in answering question", 400))
-
   }
-})
-
-
-
+);

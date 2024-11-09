@@ -3,8 +3,8 @@ import mongoose, { Document, Schema } from "mongoose";
 // Define the IComment interface
 interface IComment extends Document {
   user: object;
-  comment: string;
-  CommentReplies: IComment[];
+  question: string;
+  questionReplies: IComment[];
 }
 
 // Define the IReview interface
@@ -56,8 +56,8 @@ interface ICourse extends Document {
 // Comment Schema
 const commentSchema = new Schema<IComment>({
   user: { type: Object, required: true },
-  comment: { type: String, required: true },
-  CommentReplies: [this]
+  question: { type: String, required: true },
+  questionReplies: [Object]
 });
 
 // Review Schema

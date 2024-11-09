@@ -6,6 +6,8 @@ import { CreateCourse } from "../services/course.services";
 import CourseModel from "../models/Course.model";
 import Redis from "ioredis";
 import { client } from "../utils/RedisConnect";
+import UserModel from "../models/user.model";
+import mongoose from "mongoose";
 
 export const uploadCourse = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -140,7 +142,7 @@ export const getallCourses = CatchAsyncError(
           "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
         );
 
-        console.log("mongodb hitting")
+        console.log("mongodb hitting");
         res.status(200).json({
           success: true,
           data: courses,
@@ -153,31 +155,110 @@ export const getallCourses = CatchAsyncError(
   }
 );
 
-export const getCoursesbyUser = CatchAsyncError(async (req: Request, res:Response, next: NextFunction)=> {
+export const getCoursesbyUser = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userCousesList = req.user?.courses;
+      const courseId = req.params.user;
+      const courseExists = userCousesList?.find((course: any) => {
+        course._id.toString() == courseId;
+      });
+
+      if (!courseExists) {
+        return next(
+          new AppError("you are not eligible to access this course ", 404)
+        );
+      }
+
+      const course = await CourseModel.findById(courseId);
+      const content = course?.courseData;
+
+      res.status(200).send({
+        success: true,
+        message: "get courses by user",
+        content,
+      });
+    } catch {
+      next(new AppError("error in courses by users ", 400));
+    }
+  }
+);
+
+// add question to the courses
+
+interface IAddQuestiontoCourse {
+  question: string;
+  courseId: string;
+  contentId: string;
+}
+
+export const addQuestion = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { question, courseId, contentId }: IAddQuestiontoCourse = req.body;
+      const course = await CourseModel.findById(courseId);
+      if (!mongoose.Types.ObjectId.isValid(courseId)) {
+        return next(new AppError("invalid content id ", 400));
+      }
+      const courseContent = course?.courseData?.find((item: any) => {
+        item._id.equals(contentId);
+      });
+      if (!courseContent) {
+        return next(new AppError("invalid content id", 400));
+      }
+
+      const newQuestion: any = {
+        user: req.user,
+        question,
+        questionReplies: [],
+      };
+
+      courseContent.question.push(newQuestion);
+
+      await course?.save();
+
+      res.status(200).json({
+        success: true,
+        message: "add question successfully",
+      });
+    } catch (err: any) {
+      next(new AppError(" problem in adding question to courses: ", 404));
+    }
+  }
+);
+
+
+interface IAddAnswerData{
+ answer: string,
+ courseId: string,
+ contentId: string,
+ questionId: string,
+
+}
+
+export const addAnswer = CatchAsyncError (async (req:Request, res:Response, next: NextFunction)=> {
   try {
-const userCousesList = req.user?.courses
-const courseId = req.params.user;
-const courseExists = userCousesList?.find((course: any)=> {
-  course._id.toString()== courseId
-})
+    const { answer, courseId, contentId, questionId}: IAddAnswerData = req.body;
 
- if(!courseExists){
-  return next (new AppError("you are not eligible to access this course ", 404));
+    const course = await CourseModel.findById(courseId);
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return next(new AppError("invalid content id ", 400));
+    }
 
- }
+    const courseContent = course?.courseData?.find((item: any)=> {
+    item._id.equals(contentId);
+    })
+
+   if(course){
+    
+   }
 
 
- const  course = await CourseModel.findById(courseId);
- const content = course?.courseData
+  }catch(err){
+    next(new AppError("error in answering question", 400))
 
-res.status(200).send({
-  success: true,
-  message:"get courses by user"
-
-})
-  } catch{
-    next( new AppError("error in courses by users ", 400) );
   }
 })
+
 
 

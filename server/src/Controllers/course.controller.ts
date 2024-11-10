@@ -9,6 +9,7 @@ import { client } from "../utils/RedisConnect";
 import ejs from "ejs";
 import path from "path";
 import mongoose from "mongoose";
+import sendEmail from "../utils/Sendemail";
 
 export const uploadCourse = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -280,15 +281,22 @@ export const addAnswer = CatchAsyncError(
           title: courseContent.title,
         };
 
-      const html = await ejs.renderFile(
+        const html = await ejs.renderFile(
           path.join(__dirname, "../mails/question-reply.ejs"),
-       data );
-        // Send notification with `data`
+          data
+        );
+
+        try {
+          await sendEmail({
+            email: question.user?.email,
+            subject: "New Answer on your Question - EduAI",
+            template: "question-reply.ejs",
+            data,
+          });
+        } catch (err) {
+          next(new AppError("error in sending mail ", 400));
+        }
       }
-
-     
-
-      // Send email or return response
 
       res.status(201).json({ message: "Answer added successfully" });
     } catch (err) {

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Reply to Your Question</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      border: 1px solid #e0e0e0;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    .header {
+      text-align: center;
+      color: #4CAF50;
+    }
+    .content {
+      margin-top: 20px;
+    }
+    .question, .reply {
+      margin-bottom: 20px;
+      padding: 10px;
+      border-left: 4px solid #4CAF50;
+      background-color: #f1f1f1;
+    }
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      color: #777;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 class="header">New Reply to Your Question</h2>
+    
+    <div class="content">
+      <p>Hi <%= data.name %>,</p>
+      <p>Someone has replied to your question in the course "<strong><%= data.title %></strong>". Here are the details:</p>
+      
+      <div class="question">
+        <strong>Your Question:</strong>
+        <p><%= data.questionText %></p>
+      </div>
+
+      <div class="reply">
+        <strong>New Reply:</strong>
+        <p><%= data.replyText %></p>
+      </div>
+
+      <p>You can view the full thread and respond by visiting the course page.</p>
+    </div>
+
+    <div class="footer">
+      <p>This is an automated message, please do not reply directly to this email.</p>
+      <p>&copy; 2024 Your Course Platform. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

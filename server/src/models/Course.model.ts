@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from "mongoose";
+import {IUserInput} from "./user.model"
 
 // Define the IComment interface
 interface IComment extends Document {

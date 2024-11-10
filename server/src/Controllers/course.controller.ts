@@ -6,7 +6,8 @@ import { CreateCourse } from "../services/course.services";
 import CourseModel from "../models/Course.model";
 import Redis from "ioredis";
 import { client } from "../utils/RedisConnect";
-import UserModel from "../models/user.model";
+import ejs from "ejs";
+import path from "path";
 import mongoose from "mongoose";
 
 export const uploadCourse = CatchAsyncError(
@@ -240,38 +241,58 @@ export const addAnswer = CatchAsyncError(
       const { answer, courseId, contentId, questionId }: IAddAnswerData =
         req.body;
 
-      const course = await CourseModel.findById(courseId);
       if (!mongoose.Types.ObjectId.isValid(courseId)) {
-        return next(new AppError("invalid content id ", 400));
+        return next(new AppError("Invalid course ID", 400));
       }
 
-      const courseContent = course?.courseData?.find((item: any) => {
-        item._id.equals(contentId);
-      });
+      const course = await CourseModel.findById(courseId);
+      if (!course) {
+        return next(new AppError("Course not found", 404));
+      }
 
+      const courseContent = course.courseData.find((item: any) =>
+        item._id.equals(contentId)
+      );
       if (!courseContent) {
-        return next(new AppError("invalid content id", 400));
+        return next(new AppError("Invalid content ID", 400));
       }
 
-      const question = courseContent?.question?.find((item: any) => {
-        item._id.equals(questionId);
-      });
-
+      const question = courseContent.question.find((item: any) =>
+        item._id.equals(questionId)
+      );
       if (!question) {
-        return next(new AppError("unvalid question id", 400));
+        return next(new AppError("Invalid question ID", 400));
       }
 
       const newAnswer: any = {
-        user: req?.user,
+        user: req.user,
         answer,
-      }
-
+      };
       question.questionReplies.push(newAnswer);
 
-      await course?.save();
+      await course.save();
 
+      if (req.user?.id === question.user._id) {
+        // Handle notification for answer on own question
+      } else {
+        const data = {
+          name: question.user?.name,
+          title: courseContent.title,
+        };
+
+      const html = await ejs.renderFile(
+          path.join(__dirname, "../mails/question-reply.ejs"),
+       data );
+        // Send notification with `data`
+      }
+
+     
+
+      // Send email or return response
+
+      res.status(201).json({ message: "Answer added successfully" });
     } catch (err) {
-      next(new AppError("error in answering question", 400));
+      next(new AppError("Error in answering question", 400));
     }
   }
 );

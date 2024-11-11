@@ -307,6 +307,7 @@ export const addAnswer = CatchAsyncError(
 
 export const  AddReview= CatchAsyncError( async (req: Request, res:Response, next: NextFunction) => {
   try {
+    const {message, courseId, ratednumer}
 
   } catch(err){
     console.log("error in error")

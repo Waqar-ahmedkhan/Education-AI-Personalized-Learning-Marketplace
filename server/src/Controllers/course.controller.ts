@@ -304,3 +304,13 @@ export const addAnswer = CatchAsyncError(
     }
   }
 );
+
+export const  AddReview= CatchAsyncError( async (req: Request, res:Response, next: NextFunction) => {
+  try {
+
+  } catch(err){
+    console.log("error in error")
+    next(new AppError("Error in adding review", 400));
+  }
+
+})

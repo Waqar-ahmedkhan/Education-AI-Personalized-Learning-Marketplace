@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import ErrorHandler from "../utils/ErrorHandler";
-import { CatchAsyncError } from "../middleware/catchAsyncErrors";
-import LayoutModel from "../models/layout.model";
 import cloudinary from "cloudinary";
+import { CatchAsyncError } from "../middlewares/CatchAsyncError";
+import { AppError } from "../utils/AppError";
 
 // create layout
 export const createLayout = CatchAsyncError(
@@ -11,7 +10,7 @@ export const createLayout = CatchAsyncError(
       const { type } = req.body;
       const isTypeExist = await LayoutModel.findOne({ type });
       if (isTypeExist) {
-        return next(new ErrorHandler(`${type} already exist`, 400));
+        return next(new AppError(`${type} already exist`, 400));
       }
       if (type === "Banner") {
         const { image, title, subTitle } = req.body;
@@ -63,7 +62,7 @@ export const createLayout = CatchAsyncError(
         message: "Layout created successfully",
       });
     } catch (error: any) {
-      return next(new ErrorHandler(error.message, 500));
+      return next(new AppError(error.message, 500));
     }
   }
 );
@@ -142,7 +141,7 @@ export const editLayout = CatchAsyncError(
     } catch (error: any) {
       console.log(error);
       
-      return next(new ErrorHandler(error.message, 500));
+      return next(new AppError(error.message, 500));
     }
   }
 );
@@ -158,7 +157,7 @@ export const getLayoutByType = CatchAsyncError(
         layout,
       });
     } catch (error: any) {
-      return next(new ErrorHandler(error.message, 500));
+      return next(new AppError(error.message, 500));
     }
   }
 );

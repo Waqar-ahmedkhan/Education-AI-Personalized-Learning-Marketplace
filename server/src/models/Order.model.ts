@@ -4,7 +4,7 @@ import mongoose, {Schema, Document, Model} from "mongoose";
 export interface IOrder extends Document  {
   userId: string;
   courseId: string;
-  course_info: Object;
+  payment_info: Object;
   
 }
 
@@ -17,11 +17,10 @@ const orderSchema = new Schema<IOrder>({
     type: String,
     required: true
   },
-  course_info: {
+  payment_info: {
     type: Object,
     required: true
   }
 }, {timestamps: true});
 
-const OrderModel: Model<IOrder> = mongoose.model<IOrder>("Order", orderSchema);
 

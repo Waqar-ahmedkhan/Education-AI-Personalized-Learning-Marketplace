@@ -28,3 +28,7 @@ const notificationSchema = new Schema<INotification>({
     default: 'unread'
   }
 }, { timestamps: true})
+
+
+export const NotificaModel: Model<INotification> = mongoose.model<INotification>("NotificationModel", notificationSchema);
+

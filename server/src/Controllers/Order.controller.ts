@@ -3,11 +3,13 @@ import { CatchAsyncError } from "../middlewares/CatchAsyncError";
 import { IOrder } from "../models/Order.model";
 import { AppError } from "../utils/AppError";
 import UserModel from "../models/user.model";
-import CourseModel from "../models/Course.model";
-import path from "path"
+import CourseModel, { ICourse } from "../models/Course.model";
+import path from "path";
 import { client } from "../utils/RedisConnect";
 import ejs from "ejs";
-import { newOrder } from "../services/order.services";
+import { getAllOrdersService, newOrder } from "../services/order.services";
+import sendEmail from "../utils/Sendemail";
+import { NotificaModel } from "../models/Notification.model";
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -42,7 +44,7 @@ export const createOrder = CatchAsyncError(
         );
       }
 
-      const course: ICourseData | null = await CourseModel.findById(courseId);
+      const course: ICourse | null = await CourseModel.findById(courseId);
 
       if (!course) {
         return next(new AppError("Course not found", 404));
@@ -56,7 +58,7 @@ export const createOrder = CatchAsyncError(
 
       const mailData = {
         order: {
-          _id: course._id.toString().slice(0, 6),
+          id: course.id.toString().slice(0, 6),
           name: course.name,
           price: course.price,
           date: new Date().toLocaleDateString("en-US", {
@@ -74,7 +76,7 @@ export const createOrder = CatchAsyncError(
 
       try {
         if (user) {
-          await sendMail({
+          await sendEmail({
             email: user.email,
             subject: "Order Confirmation",
             template: "order-confirmation.ejs",
@@ -85,19 +87,22 @@ export const createOrder = CatchAsyncError(
         return next(new AppError(error.message, 500));
       }
 
-      user?.courses.push(course?._id);
+      user?.courses.push(course?.id);
 
-      await client.set(req.user?._id, JSON.stringify(user));
+      await client.set(req.user?.id, JSON.stringify(user));
 
       await user?.save();
 
-      await NotificationModel.create({
+      await NotificaModel.create({
         user: user?._id,
         title: "New Order",
         message: `You have a new order from ${course?.name}`,
       });
 
-      course.purchased = course.purchased + 1;
+      if (course) {
+        //+
+        course.purchased = (course.purchased || 0) + 1; //+
+      } //+
 
       await course.save();
 

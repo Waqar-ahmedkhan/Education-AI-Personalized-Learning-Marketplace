@@ -9,6 +9,7 @@ import { connectRedis } from "./utils/RedisConnect";
 import  UserRoute  from "./routes/user.route"
 import  CourseRoute  from "./routes/course.route"
 import courseRouter from "./routes/course.route";
+import orderRoute from "./routes/order.route";
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ connectRedis();
 
 app.use("/api/v1", UserRoute)
 app.use("/api/v1", courseRouter)
+app.use("/api/v1", orderRoute);
 app.use((err: Error, req: Request, res: Response, next: () => void) => {
   console.error(err.stack);
   res.status(500).send("Something went wrong");

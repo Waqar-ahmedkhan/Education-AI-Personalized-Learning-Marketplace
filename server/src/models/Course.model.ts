@@ -2,14 +2,14 @@ import mongoose, { Document, Schema } from "mongoose";
 import {IUserInput} from "./user.model"
 
 // Define the IComment interface
-interface IComment extends Document {
+export interface IComment extends Document {
   user: IUserInput;
   question: string;
   questionReplies: IComment[];
 }
 
 // Define the IReview interface
-interface IReview extends Document {
+export interface IReview extends Document {
   user: object;
   rating: number;
   comment: string;
@@ -17,13 +17,13 @@ interface IReview extends Document {
 }
 
 // Define the ILink interface
-interface ILink extends Document {
+export interface ILink extends Document {
   title: string;
   url: string;
 }
 
-// Define the ICoursesData interface
-interface ICoursesData extends Document {
+// Define the ICoursesData interfacee
+export interface ICoursesData extends Document {
   title: string;
   description: string;
   videoUrl: string;
@@ -37,7 +37,7 @@ interface ICoursesData extends Document {
 }
 
 // Define the ICourse interface
-interface ICourse extends Document {
+export interface ICourse extends Document {
   name: string;
   description: string;
   price: number;

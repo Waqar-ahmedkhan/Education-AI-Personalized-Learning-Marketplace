@@ -405,15 +405,15 @@ export const addReplyToReview = CatchAsyncError(
         updatedAt: new Date().toISOString(),
       };
 
-      if (!review.commentReplies) {
-        review.commentReplies = [];
+      if (!review.CommentReplies) {
+        review.CommentReplies = [];
       }
 
-      review.commentReplies?.push(replyData);
+      review.CommentReplies?.push(replyData);
 
       await course?.save();
 
-      await client.set(courseId, JSON.stringify(course), "EX", 604800); // 7days
+      // await client.set(courseId, JSON.stringify(course), "EX", 604800); // 7days
 
       res.status(200).json({
         success: true,
@@ -429,7 +429,7 @@ export const addReplyToReview = CatchAsyncError(
 export const getAdminAllCourses = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      getAllCoursesService(res);
+      // getAllCoursesService(res);
     } catch (error: any) {
       return next(new AppError(error.message, 400));
     }

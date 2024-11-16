@@ -10,7 +10,7 @@ import ejs from "ejs";
 import path from "path";
 import mongoose from "mongoose";
 import sendEmail from "../utils/Sendemail";
-import axios from "axios"
+import axios from "axios";
 
 export const uploadCourse = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -350,20 +350,19 @@ export const addReview = CatchAsyncError(
       });
 
       if (course) {
-        course.ratings = avg / course.reviews.length; // one example we have 2 reviews one is 5 another one is 4 so math working like this = 9 / 2  = 4.5 ratings
+        course.rating = avg / course.reviews.length; // one example we have 2 reviews one is 5 another one is 4 so math working like this = 9 / 2  = 4.5 ratings
       }
 
       await course?.save();
 
-      await client.set(courseId, JSON.stringify(course), "EX", 604800); // 7days
+      // await client.set(courseId, JSON.stringify(course), "EX", 604800); // 7days
 
-      // create notification
-      await NotificationModel.create({
-        user: req.user?._id,
-        title: "New Review Received",
-        message: `${req.user?.name} has given a review in ${course?.name}`,
-      });
-
+      // // create notification
+      // await NotificationModel.create({
+      //   user: req.user?._id,
+      //   title: "New Review Received",
+      //   message: `${req.user?.name} has given a review in ${course?.name}`,
+      // });
 
       res.status(200).json({
         success: true,
@@ -374,7 +373,6 @@ export const addReview = CatchAsyncError(
     }
   }
 );
-
 
 interface IAddReviewData {
   comment: string;
@@ -486,4 +484,3 @@ export const generateVideoUrl = CatchAsyncError(
     }
   }
 );
-

@@ -13,7 +13,7 @@ interface IReview extends Document {
   user: object;
   rating: number;
   comment: string;
-  CommentReplies: IComment[];
+  CommentReplies?: IComment[];
 }
 
 // Define the ILink interface
@@ -66,7 +66,7 @@ const reviewSchema = new Schema<IReview>({
   user: { type: Object, required: true },
   rating: { type: Number, default: 0 },
   comment: { type: String, required: true },
-  CommentReplies: [commentSchema]
+  CommentReplies: [Object]
 });
 
 // Link Schema

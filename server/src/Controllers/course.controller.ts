@@ -11,6 +11,7 @@ import path from "path";
 import mongoose from "mongoose";
 import sendEmail from "../utils/Sendemail";
 import axios from "axios";
+import { NotificaModel } from "../models/Notification.model";
 
 export const uploadCourse = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -218,6 +219,12 @@ export const addQuestion = CatchAsyncError(
 
       courseContent.question.push(newQuestion);
 
+      await NotificaModel.create({
+        user:req.user?._id,
+        title: "new question Recived",
+        message:`you have a new question in  ${courseContent.title}`
+      })
+
       await course?.save();
 
       res.status(200).json({
@@ -275,7 +282,13 @@ export const addAnswer = CatchAsyncError(
       await course.save();
 
       if (req.user?.id === question.user._id) {
+
         // Handle notification for answer on own question
+          await NotificaModel.create({
+            user:req.user?._id,
+            title: "new Question reply recived",
+            message: `you have a new question reply in  ${courseContent.title}`
+          })
       } else {
         const data = {
           name: question.user?.name,
@@ -355,14 +368,14 @@ export const addReview = CatchAsyncError(
 
       await course?.save();
 
-      // await client.set(courseId, JSON.stringify(course), "EX", 604800); // 7days
+      await client.set(courseId, JSON.stringify(course), "EX", 604800); // 7days
 
-      // // create notification
-      // await NotificationModel.create({
-      //   user: req.user?._id,
-      //   title: "New Review Received",
-      //   message: `${req.user?.name} has given a review in ${course?.name}`,
-      // });
+      // create notification
+      await NotificaModel.create({
+        user: req.user?._id,
+        title: "New Review Received",
+        message: `${req.user?.name} has given a review in ${course?.name}`,
+      });
 
       res.status(200).json({
         success: true,
@@ -413,7 +426,7 @@ export const addReplyToReview = CatchAsyncError(
 
       await course?.save();
 
-      // await client.set(courseId, JSON.stringify(course), "EX", 604800); // 7days
+      await client.set(courseId, JSON.stringify(course), "EX", 604800); // 7days
 
       res.status(200).json({
         success: true,
@@ -484,3 +497,6 @@ export const generateVideoUrl = CatchAsyncError(
     }
   }
 );
+
+
+

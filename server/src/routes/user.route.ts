@@ -28,4 +28,5 @@ UserRoute.put("/update-user-info",isAuthenticated, UpdateUserInformation);
 UserRoute.put("/update-password",isAuthenticated, UpdatePassword);// not tested
 UserRoute.put("/avatar-upload",isAuthenticated, UpdateProfilePicture);// not tested
 
+
 export default UserRoute;

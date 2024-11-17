@@ -2,7 +2,10 @@ import { NextFunction, Request, Response } from "express";
 import { CatchAsyncError } from "../middlewares/CatchAsyncError";
 import { AppError } from "../utils/AppError";
 import Cloudinary from "cloudinary";
-import { CreateCourse, getallCoursesServices } from "../services/course.services";
+import {
+  CreateCourse,
+  getallCoursesServices,
+} from "../services/course.services";
 import CourseModel from "../models/Course.model";
 import Redis from "ioredis";
 import { client } from "../utils/RedisConnect";
@@ -106,6 +109,8 @@ export const GetSingleCourse = CatchAsyncError(
         const course = await CourseModel.findById(courseId).select(
           "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
         );
+
+        await client.set(courseId, JSON.stringify(course), "Ex", 6048000)
 
         if (!course) {
           return next(new AppError("Course not found", 404));
@@ -221,10 +226,10 @@ export const addQuestion = CatchAsyncError(
       courseContent.question.push(newQuestion);
 
       await NotificaModel.create({
-        user:req.user?._id,
+        user: req.user?._id,
         title: "new question Recived",
-        message:`you have a new question in  ${courseContent.title}`
-      })
+        message: `you have a new question in  ${courseContent.title}`,
+      });
 
       await course?.save();
 
@@ -283,13 +288,12 @@ export const addAnswer = CatchAsyncError(
       await course.save();
 
       if (req.user?.id === question.user._id) {
-
         // Handle notification for answer on own question
-          await NotificaModel.create({
-            user:req.user?._id,
-            title: "new Question reply recived",
-            message: `you have a new question reply in  ${courseContent.title}`
-          })
+        await NotificaModel.create({
+          user: req.user?._id,
+          title: "new Question reply recived",
+          message: `you have a new question reply in  ${courseContent.title}`,
+        });
       } else {
         const data = {
           name: question.user?.name,
@@ -498,5 +502,3 @@ export const generateVideoUrl = CatchAsyncError(
     }
   }
 );
-
-

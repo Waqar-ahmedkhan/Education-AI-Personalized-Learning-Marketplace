@@ -23,34 +23,32 @@ export const getUsersAnalytics = CatchAsyncError(
 
 // get courses analytics --- only for admin
 export const getCoursesAnalytics = CatchAsyncError(
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const courses = await generateLast12MothsData(CourseModel);
-  
-        res.status(200).json({
-          success: true,
-          courses,
-        });
-      } catch (error: any) {
-        return next(new AppError(error.message, 500));
-      }
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const courses = await generateLast12MothsData(CourseModel);
+
+      res.status(200).json({
+        success: true,
+        courses,
+      });
+    } catch (error: any) {
+      return next(new AppError(error.message, 500));
     }
-  );
-  
-  
+  }
+);
+
 // get order analytics --- only for admin
 export const getOrderAnalytics = CatchAsyncError(
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const orders = await generateLast12MothsData(OrderModel);
-  
-        res.status(200).json({
-          success: true,
-          orders,
-        });
-      } catch (error: any) {
-        return next(new AppError(error.message, 500));
-      }
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orders = await generateLast12MothsData(OrderModel);
+
+      res.status(200).json({
+        success: true,
+        orders,
+      });
+    } catch (error: any) {
+      return next(new AppError(error.message, 500));
     }
-  );
-  
+  }
+);

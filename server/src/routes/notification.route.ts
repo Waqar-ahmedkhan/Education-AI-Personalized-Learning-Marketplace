@@ -9,6 +9,7 @@ notificationRoute.get("/get-all-notifications", isAuthenticated, authorizedRoles
 notificationRoute.put("/update-notification/:id", isAuthenticated, authorizedRoles("admin"), updateNotification);
 
 
+
 export default notificationRoute;
 
 

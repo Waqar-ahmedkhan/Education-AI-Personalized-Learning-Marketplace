@@ -47,13 +47,19 @@ export const updateNotification = CatchAsyncError(
   }
 );
 
-  cron.schedule("0 0 0 * * *", async () => {
-    try {
-      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-      const result = await NotificaModel.deleteMany({ createdAt: { $lt: threeDaysAgo } });
-      console.log(`Cron Job: Deleted ${result.deletedCount} old notifications`);
-    } catch (error) {
-      console.error("Error running cron job for cleaning notifications:", error);
-    }
-  });
+cron.schedule("0 0 0 * * *", async () => {
+  try {
+    // Calculate the date 3 days ago
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 
+    // Delete notifications with 'read' status that were created more than 3 days ago
+    const result = await NotificaModel.deleteMany({
+      status: "read",
+      createdAt: { $lt: threeDaysAgo }, // Corrected operator here
+    });
+
+    console.log(`Cron Job: Deleted ${result.deletedCount} old notifications`);
+  } catch (error) {
+    console.error("Error running cron job for cleaning notifications:", error);
+  }
+});

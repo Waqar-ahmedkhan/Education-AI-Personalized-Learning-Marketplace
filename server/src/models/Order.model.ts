@@ -23,4 +23,6 @@ const orderSchema = new Schema<IOrder>({
   }
 }, {timestamps: true});
 
+export const OrderModel: Model<IOrder> = mongoose.model<IOrder>("OrderModel", orderSchema);
+
 

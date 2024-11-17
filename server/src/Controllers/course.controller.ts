@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { CatchAsyncError } from "../middlewares/CatchAsyncError";
 import { AppError } from "../utils/AppError";
 import Cloudinary from "cloudinary";
-import { CreateCourse } from "../services/course.services";
+import { CreateCourse, getallCoursesServices } from "../services/course.services";
 import CourseModel from "../models/Course.model";
 import Redis from "ioredis";
 import { client } from "../utils/RedisConnect";
@@ -12,6 +12,7 @@ import mongoose from "mongoose";
 import sendEmail from "../utils/Sendemail";
 import axios from "axios";
 import { NotificaModel } from "../models/Notification.model";
+import { getalluserServices } from "../services/user.services";
 
 export const uploadCourse = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -442,7 +443,7 @@ export const addReplyToReview = CatchAsyncError(
 export const getAdminAllCourses = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // getAllCoursesService(res);
+      getalluserServices(res);
     } catch (error: any) {
       return next(new AppError(error.message, 400));
     }
@@ -497,6 +498,5 @@ export const generateVideoUrl = CatchAsyncError(
     }
   }
 );
-
 
 

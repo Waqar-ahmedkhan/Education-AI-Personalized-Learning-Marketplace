@@ -10,8 +10,13 @@ import {
   sendToken,
 } from "../utils/jwt";
 import { client } from "../utils/RedisConnect";
-import { getUserbyId } from "../services/user.services";
+import {
+  getalluserServices,
+  getUserbyId,
+  UpdateUserRoleServices,
+} from "../services/user.services";
 import cloudinary from "cloudinary";
+import { getAllOrdersService } from "../services/order.services";
 
 interface IRegistrationBody {
   name: string;
@@ -513,10 +518,57 @@ export const UpdateProfilePicture = CatchAsyncError(
         await client.set(String(userId), JSON.stringify(user));
       }
 
-      res.status(200).json({ success: true, message: "Profile picture updated successfully", user });
-
+      res
+        .status(200)
+        .json({
+          success: true,
+          message: "Profile picture updated successfully",
+          user,
+        });
     } catch (err) {
       next(new AppError("Error in updating profile picture", 400));
+    }
+  }
+);
+
+export const getallUsers = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      getalluserServices(res);
+    } catch (error) {
+      next(new AppError("this errror in getalluser", 400));
+    }
+  }
+);
+
+export const updateUserRoles = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id, role } = req.body;
+      UpdateUserRoleServices(res, id, role);
+    } catch (error) {
+      next(new AppError("this errror in updating user role", 400));
+    }
+  }
+);
+
+export const deleteUser = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const user = UserModel.findById({ id });
+      if (!user) {
+        next(new AppError("user not found", 400));
+      }
+
+      await user.deleteOne({ id });
+      client.del(id);
+      res.status(200).send({
+        success: true,
+        message: "delete use successfully",
+      });
+    } catch (error) {
+      next(new AppError("erroring in deleteUser", 400));
     }
   }
 );

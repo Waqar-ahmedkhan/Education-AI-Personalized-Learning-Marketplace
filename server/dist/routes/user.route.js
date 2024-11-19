@@ -15,6 +15,10 @@ UserRoute.get("/refresh", user_controller_1.updateAccessToken);
 UserRoute.get("/me", auth_1.isAuthenticated, user_controller_1.getUserInformatin);
 UserRoute.post("/soical-auth", user_controller_1.socialAuth);
 UserRoute.put("/update-user-info", auth_1.isAuthenticated, user_controller_1.UpdateUserInformation);
-UserRoute.put("/update-password", auth_1.isAuthenticated, user_controller_1.UpdatePassword);
-UserRoute.put("/avatar-upload", auth_1.isAuthenticated, user_controller_1.UpdateProfilePicture);
+// there are those routes are which are not tested like for last 4 5 days
+UserRoute.put("/update-password", auth_1.isAuthenticated, user_controller_1.UpdatePassword); // not tested
+UserRoute.put("/avatar-upload", auth_1.isAuthenticated, user_controller_1.UpdateProfilePicture); // not tested
+UserRoute.get("/get-users", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.getallUsers); //not tested
+UserRoute.put("/update-user-route", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.updateUserRoles); //not tested
+UserRoute.delete("/user-delete", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.deleteUser);
 exports.default = UserRoute;

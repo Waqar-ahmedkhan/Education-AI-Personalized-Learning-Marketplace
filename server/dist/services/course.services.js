@@ -12,35 +12,28 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateUserRoleServices = exports.getalluserServices = exports.getUserbyId = void 0;
-const user_model_1 = __importDefault(require("../models/user.model"));
-const RedisConnect_1 = require("../utils/RedisConnect");
-const getUserbyId = (id, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const userJson = yield RedisConnect_1.client.get(id);
-    if (userJson) {
-        const user = JSON.parse(userJson);
+exports.getallCoursesServices = exports.CreateCourse = void 0;
+const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
+const Course_model_1 = __importDefault(require("../models/Course.model"));
+exports.CreateCourse = (0, CatchAsyncError_1.CatchAsyncError)((data, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const course = yield Course_model_1.default.create(data);
         res.status(201).json({
             success: true,
-            user,
+            message: "Course created successfully",
+            data: course
         });
     }
-});
-exports.getUserbyId = getUserbyId;
-const getalluserServices = (res) => __awaiter(void 0, void 0, void 0, function* () {
-    const users = yield user_model_1.default.find().sort({ createdAt: -1 });
+    catch (err) {
+        console.log("error in creating course");
+    }
+}));
+const getallCoursesServices = (res) => __awaiter(void 0, void 0, void 0, function* () {
+    const courses = yield Course_model_1.default.find().sort({ createdAt: -1 });
     res.status(201).json({
         success: true,
         message: "message in coding",
-        users
+        courses
     });
 });
-exports.getalluserServices = getalluserServices;
-const UpdateUserRoleServices = (res, id, role) => __awaiter(void 0, void 0, void 0, function* () {
-    const users = yield user_model_1.default.findByIdAndUpdate(id, { role }, { new: true });
-    res.status(201).json({
-        success: true,
-        message: "message in coding",
-        users
-    });
-});
-exports.UpdateUserRoleServices = UpdateUserRoleServices;
+exports.getallCoursesServices = getallCoursesServices;

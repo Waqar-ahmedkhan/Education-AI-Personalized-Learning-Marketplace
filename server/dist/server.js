@@ -15,5 +15,7 @@ cloudinary_1.v2.config({
 });
 index_1.app.listen(process.env.PORT, () => {
     console.log(`Server is running on port ${process.env.PORT}`);
+    console.log(`Server is running on port ${process.env.PORT}`);
+    console.log("hello world");
     (0, dbConnect_1.default)();
 });

@@ -13,6 +13,9 @@ const AppError_1 = require("./utils/AppError");
 const GlobalErrorhandler_1 = require("./middlewares/GlobalErrorhandler");
 const RedisConnect_1 = require("./utils/RedisConnect");
 const user_route_1 = __importDefault(require("./routes/user.route"));
+const course_route_1 = __importDefault(require("./routes/course.route"));
+const order_route_1 = __importDefault(require("./routes/order.route"));
+const notification_route_1 = __importDefault(require("./routes/notification.route"));
 dotenv_1.default.config();
 exports.app = (0, express_1.default)();
 // Middlewares
@@ -23,6 +26,9 @@ exports.app.use((0, cookie_parser_1.default)());
 //connectDbs
 (0, RedisConnect_1.connectRedis)();
 exports.app.use("/api/v1", user_route_1.default);
+exports.app.use("/api/v1", course_route_1.default);
+exports.app.use("/api/v1", order_route_1.default);
+exports.app.use("/api/v1", notification_route_1.default);
 exports.app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send("Something went wrong");
@@ -43,6 +49,3 @@ exports.app.all("*", (req, res, next) => {
     next(new AppError_1.AppError(`Cannot find ${req.originalUrl} on this server`, 404));
 });
 exports.app.use(GlobalErrorhandler_1.globalErrorHandler);
-// app.listen(port, () => {
-//   console.log(`Server is running on port ${port}`);
-// });

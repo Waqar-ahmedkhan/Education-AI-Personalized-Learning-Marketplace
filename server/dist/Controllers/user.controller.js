@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -244,6 +244,7 @@ exports.updateAccessToken = (0, CatchAsyncError_1.CatchAsyncError)((req, res, ne
         // Set new cookies
         res.cookie("access_token", access_token, jwt_1.accessTokenOptions);
         res.cookie("refresh_token", new_refresh_token, jwt_1.refreshTokenOptions);
+        yield RedisConnect_1.client.set(user._id, JSON.stringify(user), { "EX": 6048000 });
         res.status(200).json({
             status: "success",
             access_token,
@@ -376,9 +377,48 @@ exports.UpdateProfilePicture = (0, CatchAsyncError_1.CatchAsyncError)((req, res,
             // Cache the updated user object
             yield RedisConnect_1.client.set(String(userId), JSON.stringify(user));
         }
-        res.status(200).json({ success: true, message: "Profile picture updated successfully", user });
+        res.status(200).json({
+            success: true,
+            message: "Profile picture updated successfully",
+            user,
+        });
     }
     catch (err) {
         next(new AppError_1.AppError("Error in updating profile picture", 400));
+    }
+}));
+exports.getallUsers = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        (0, user_services_1.getalluserServices)(res);
+    }
+    catch (error) {
+        next(new AppError_1.AppError("this errror in getalluser", 400));
+    }
+}));
+exports.updateUserRoles = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id, role } = req.body;
+        (0, user_services_1.UpdateUserRoleServices)(res, id, role);
+    }
+    catch (error) {
+        next(new AppError_1.AppError("this errror in updating user role", 400));
+    }
+}));
+exports.deleteUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const user = user_model_1.default.findById({ id });
+        if (!user) {
+            next(new AppError_1.AppError("user not found", 400));
+        }
+        yield user.deleteOne({ id });
+        RedisConnect_1.client.del(id);
+        res.status(200).send({
+            success: true,
+            message: "delete use successfully",
+        });
+    }
+    catch (error) {
+        next(new AppError_1.AppError("erroring in deleteUser", 400));
     }
 }));

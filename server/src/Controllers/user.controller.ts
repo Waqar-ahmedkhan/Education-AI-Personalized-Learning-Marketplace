@@ -336,7 +336,7 @@ export const updateAccessToken = CatchAsyncError(
       res.cookie("access_token", access_token, accessTokenOptions);
       res.cookie("refresh_token", new_refresh_token, refreshTokenOptions);
 
-      await client.set(user._id, JSON.stringify(user), "EX", 6048000);
+      await client.set(user._id, JSON.stringify(user), { "EX": 6048000});
 
       res.status(200).json({
         status: "success",

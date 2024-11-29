@@ -110,7 +110,7 @@ export const GetSingleCourse = CatchAsyncError(
           "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
         );
 
-        await client.set(courseId, JSON.stringify(course), { "EX": 6048000})
+        await client.set(courseId, JSON.stringify(course), { EX: 6048000 });
 
         if (!course) {
           return next(new AppError("Course not found", 404));
@@ -373,7 +373,7 @@ export const addReview = CatchAsyncError(
 
       await course?.save();
 
-      await client.set(courseId, JSON.stringify(course),{ "EX": 604800}); // 7days
+      await client.set(courseId, JSON.stringify(course), { EX: 604800 }); // 7days
 
       // create notification
       await NotificaModel.create({
@@ -431,7 +431,7 @@ export const addReplyToReview = CatchAsyncError(
 
       await course?.save();
 
-      await client.set(courseId, JSON.stringify(course), {  "EX": 604800}); // 7days
+      await client.set(courseId, JSON.stringify(course), { EX: 604800 }); // 7days
 
       res.status(200).json({
         success: true,

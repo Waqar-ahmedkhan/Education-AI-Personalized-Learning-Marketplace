@@ -15,23 +15,25 @@ export const getUserbyId = async (id: string, res: Response) => {
 };
 
 export const getalluserServices = async (res: Response) => {
-  const users = await UserModel.find().sort({createdAt: -1})
+  const users = await UserModel.find().sort({ createdAt: -1 });
 
   res.status(201).json({
     success: true,
     message: "message in coding",
-    users
-  })
-}
+    users,
+  });
+};
 
-export const UpdateUserRoleServices = async (res: Response, id: string, role: string) => {
-  const users = await UserModel.findByIdAndUpdate(id,{role}, { new: true})
+export const UpdateUserRoleServices = async (
+  res: Response,
+  id: string,
+  role: string
+) => {
+  const users = await UserModel.findByIdAndUpdate(id, { role }, { new: true });
 
   res.status(201).json({
     success: true,
     message: "message in coding",
-    users
-  })
-}
-
-
+    users,
+  });
+};

@@ -140,7 +140,7 @@ export const editLayout = CatchAsyncError(
       });
     } catch (error: any) {
       console.log(error);
-      
+
       return next(new AppError(error.message, 500));
     }
   }

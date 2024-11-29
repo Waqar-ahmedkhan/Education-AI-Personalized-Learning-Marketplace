@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 require("dotenv").config();
 
 // Base interface for user input
+// Enhanced User Interface
 export interface IUserInput extends Document {
   name: string;
   email: string;
@@ -15,12 +16,16 @@ export interface IUserInput extends Document {
   role: string;
   isVerified: boolean;
   courses: Array<{ courseId: string }>;
+  preferences: string[]; // Array of user-selected topics
+  recommendedCourses: Array<{ courseId: string; score: number }>; // Recommended courses
   comparePassword: (password: string) => Promise<boolean>;
   SignAccessToken: () => string;
   SignRefreshToken: () => string;
 }
 
+
 // User Schema definition
+// Enhanced User Schema
 const userSchema = new Schema<IUserInput>(
   {
     name: {
@@ -58,7 +63,17 @@ const userSchema = new Schema<IUserInput>(
     },
     courses: [
       {
-        courseId: String,
+        courseId: { type: String, required: true },
+      },
+    ],
+    preferences: {
+      type: [String],
+      default: [], // User's topic preferences
+    },
+    recommendedCourses: [
+      {
+        courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
+        score: { type: Number, default: 0 }, // Recommendation score
       },
     ],
   },
@@ -67,16 +82,14 @@ const userSchema = new Schema<IUserInput>(
   }
 );
 
-// Access Token Signing
+// Sign Access Token
 userSchema.methods.SignAccessToken = function () {
-  return jwt.sign(
-    { id: this._id },
-    process.env.ACCESS_TOKEN_SECRET as string,
-    { expiresIn: process.env.ACCESS_TOKEN_EXPIRE || "15m" }
-  );
+  return jwt.sign({ id: this._id }, process.env.ACCESS_TOKEN_SECRET as string, {
+    expiresIn: process.env.ACCESS_TOKEN_EXPIRE || "15m",
+  });
 };
 
-// Refresh Token Signing
+// Sign Refresh Token
 userSchema.methods.SignRefreshToken = function () {
   return jwt.sign(
     { id: this._id },
@@ -85,7 +98,7 @@ userSchema.methods.SignRefreshToken = function () {
   );
 };
 
-// Hash password before saving
+// Hash Password Before Saving
 userSchema.pre<IUserInput>("save", async function (next) {
   if (!this.isModified("password")) {
     return next();
@@ -98,11 +111,14 @@ userSchema.pre<IUserInput>("save", async function (next) {
   }
 });
 
-// Method to compare passwords
-userSchema.methods.comparePassword = async function (password: string): Promise<boolean> {
+// Compare Passwords
+userSchema.methods.comparePassword = async function (
+  password: string
+): Promise<boolean> {
   return bcrypt.compare(password, this.password);
 };
 
+// Export the User Model
 const UserModel: Model<IUserInput> = mongoose.model("User", userSchema);
 
 export default UserModel;

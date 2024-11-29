@@ -6,7 +6,7 @@ import bodyParser from "body-parser";
 import { AppError } from "./utils/AppError";
 import { globalErrorHandler } from "./middlewares/GlobalErrorhandler";
 import { connectRedis } from "./utils/RedisConnect";
-import  UserRoute  from "./routes/user.route"
+import UserRoute from "./routes/user.route";
 import courseRouter from "./routes/course.route";
 import orderRoute from "./routes/order.route";
 import notificationRoute from "./routes/notification.route";
@@ -24,9 +24,8 @@ app.use(cookieParser());
 //connectDbs
 connectRedis();
 
-
-app.use("/api/v1", UserRoute)
-app.use("/api/v1", courseRouter)
+app.use("/api/v1", UserRoute);
+app.use("/api/v1", courseRouter);
 app.use("/api/v1", orderRoute);
 app.use("/api/v1", notificationRoute);
 app.use((err: Error, req: Request, res: Response, next: () => void) => {
@@ -52,6 +51,3 @@ app.all("*", (req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use(globalErrorHandler);
-
-
-

@@ -22,5 +22,5 @@ const layoutSchema = new mongoose_1.Schema({
         subTitle: { type: String },
     },
 });
-const LayoutModel = (0, mongoose_1.model)('Layout', layoutSchema);
+const LayoutModel = (0, mongoose_1.model)("Layout", layoutSchema);
 exports.default = LayoutModel;

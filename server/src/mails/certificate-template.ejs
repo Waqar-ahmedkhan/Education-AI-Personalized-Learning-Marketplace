@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+    
+    .certificate-container {
+      width: 850px;
+      height: 600px;
+      position: relative;
+      margin: 20px auto;
+      background-color: white;
+      padding: 30px;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.1);
+      border: 1px solid #e0e0e0;
+      background-image: radial-gradient(ellipse at top, rgba(200, 240, 255, 0.4) 0%, transparent 70%);
+    }
+    
+    .certificate-header {
+      margin-bottom: 20px;
+    }
+    
+    .logo {
+      width: 150px;
+      height: 80px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+    }
+    
+    .logo-text {
+      font-weight: bold;
+      font-size: 36px;
+      color: #0066cc;
+      letter-spacing: 1px;
+    }
+    
+    .logo-icon {
+      color: #0066cc;
+      margin-right: 8px;
+      font-size: 40px;
+    }
+    
+    h1 {
+      font-size: 48px;
+      margin: 25px 0 15px;
+      color: #333;
+      font-weight: 300;
+      text-transform: uppercase;
+      letter-spacing: 6px;
+    }
+    
+    .subtitle {
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 40px;
+      font-style: italic;
+    }
+    
+    .content {
+      margin: 30px 0;
+    }
+    
+    .intro {
+      font-size: 22px;
+      color: #555;
+    }
+    
+    .name {
+      font-weight: bold;
+      font-size: 34px;
+      margin: 20px 0;
+      color: #0066cc;
+      border-bottom: 2px solid #ddd;
+      padding-bottom: 5px;
+      display: inline-block;
+    }
+    
+    .course {
+      font-weight: bold;
+      font-size: 26px;
+      margin: 20px 0;
+      color: #333;
+    }
+    
+    .date {
+      font-size: 18px;
+      margin-top: 30px;
+      color: #555;
+    }
+    
+    .signature-line {
+      width: 200px;
+      height: 1px;
+      background-color: #333;
+      margin: 50px auto 5px;
+    }
+    
+    .signature {
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    
+    .certificate-footer {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #999;
+    }
+    
+    .border {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      right: 15px;
+      bottom: 15px;
+      border: 2px solid #0066cc;
+      pointer-events: none;
+    }
+    
+    .corner {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-color: #0066cc;
+      border-width: 5px;
+    }
+    
+    .corner-top-left {
+      top: 5px;
+      left: 5px;
+      border-top-style: solid;
+      border-left-style: solid;
+    }
+    
+    .corner-top-right {
+      top: 5px;
+      right: 5px;
+      border-top-style: solid;
+      border-right-style: solid;
+    }
+    
+    .corner-bottom-left {
+      bottom: 5px;
+      left: 5px;
+      border-bottom-style: solid;
+      border-left-style: solid;
+    }
+    
+    .corner-bottom-right {
+      bottom: 5px;
+      right: 5px;
+      border-bottom-style: solid;
+      border-right-style: solid;
+    }
+    
+    .ribbon {
+      position: absolute;
+      top: -10px;
+      right: 20px;
+      width: 100px;
+      height: 100px;
+      overflow: hidden;
+    }
+    
+    .ribbon-text {
+      position: absolute;
+      top: 25px;
+      right: -25px;
+      background-color: #ff9800;
+      color: white;
+      padding: 5px 20px;
+      font-size: 12px;
+      transform: rotate(45deg);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="certificate-container">
+    <div class="border"></div>
+    <div class="corner corner-top-left"></div>
+    <div class="corner corner-top-right"></div>
+    <div class="corner corner-bottom-left"></div>
+    <div class="corner corner-bottom-right"></div>
+    
+    <div class="ribbon">
+      <div class="ribbon-text">VERIFIED</div>
+    </div>
+    
+    <div class="certificate-header">
+      <div class="logo">
+        <span class="logo-icon">🎓</span>
+        <span class="logo-text">EduAI</span>
+      </div>
+    </div>
+    
+    <h1>Certificate of Completion</h1>
+    <div class="subtitle">Excellence in Education Through Artificial Intelligence</div>
+    
+    <div class="content">
+      <p class="intro">This is to certify that</p>
+      <div class="name"><%= userName %></div>
+      <p class="intro">has successfully completed the course</p>
+      <div class="course"><%= courseName %></div>
+      <p class="date">Completed on <%= date %></p>
+    </div>
+    
+    <div class="signature-line"></div>
+    <div class="signature">Program Director</div>
+    
+    <div class="certificate-footer">
+      Certificate ID: EAI-<%= new Date().getFullYear() %>-<%= Math.floor(Math.random() * 10000) %>
+    </div>
+  </div>
+</body>
+</html>

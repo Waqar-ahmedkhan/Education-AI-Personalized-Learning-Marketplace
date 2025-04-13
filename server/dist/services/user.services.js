@@ -31,7 +31,7 @@ const getalluserServices = (res) => __awaiter(void 0, void 0, void 0, function* 
     res.status(201).json({
         success: true,
         message: "message in coding",
-        users
+        users,
     });
 });
 exports.getalluserServices = getalluserServices;
@@ -40,7 +40,7 @@ const UpdateUserRoleServices = (res, id, role) => __awaiter(void 0, void 0, void
     res.status(201).json({
         success: true,
         message: "message in coding",
-        users
+        users,
     });
 });
 exports.UpdateUserRoleServices = UpdateUserRoleServices;

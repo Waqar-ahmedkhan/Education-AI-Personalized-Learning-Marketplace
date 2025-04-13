@@ -29,9 +29,16 @@ exports.isAuthenticated = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next
         }
         catch (err) {
             if (err.name === "TokenExpiredError") {
-                return res.status(401).json({ success: false, message: "Token expired. Please login again." });
+                return res
+                    .status(401)
+                    .json({
+                    success: false,
+                    message: "Token expired. Please login again.",
+                });
             }
-            return res.status(401).json({ success: false, message: "Invalid token." });
+            return res
+                .status(401)
+                .json({ success: false, message: "Invalid token." });
         }
         const user = yield RedisConnect_1.client.get(decoded.id);
         if (!user) {

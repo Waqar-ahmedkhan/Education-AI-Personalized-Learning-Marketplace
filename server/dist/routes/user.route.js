@@ -20,5 +20,8 @@ UserRoute.put("/update-password", auth_1.isAuthenticated, user_controller_1.Upda
 UserRoute.put("/avatar-upload", auth_1.isAuthenticated, user_controller_1.UpdateProfilePicture); // not tested
 UserRoute.get("/get-users", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.getallUsers); //not tested
 UserRoute.put("/update-user-route", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.updateUserRoles); //not tested
-UserRoute.delete("/user-delete", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.deleteUser);
+UserRoute.delete("/user-delete/:id", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.deleteUser);
+UserRoute.post("/create-admin", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.createAdmin);
+// Route for creating the initial admin user (requires setup key)
+UserRoute.post("/setup-initial-admin", user_controller_1.createInitialAdmin);
 exports.default = UserRoute;

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.createInitialAdmin = exports.createAdmin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -407,18 +407,115 @@ exports.updateUserRoles = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next
 exports.deleteUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const user = user_model_1.default.findById({ id });
+        // Find user by ID
+        const user = yield user_model_1.default.findById(id);
         if (!user) {
-            next(new AppError_1.AppError("user not found", 400));
+            return next(new AppError_1.AppError("User not found", 404));
         }
-        yield user.deleteOne({ id });
-        RedisConnect_1.client.del(id);
-        res.status(200).send({
+        // Delete the user
+        yield user.deleteOne();
+        // Remove from Redis (if applicable)
+        if (RedisConnect_1.client) {
+            RedisConnect_1.client.del(id);
+        }
+        res.status(200).json({
             success: true,
-            message: "delete use successfully",
+            message: "User deleted successfully",
         });
     }
     catch (error) {
-        next(new AppError_1.AppError("erroring in deleteUser", 400));
+        next(new AppError_1.AppError("Error in deleteUser", 500));
+    }
+}));
+exports.createAdmin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { name, email, password } = req.body;
+        // Validate required fields
+        if (!email || !password || !name) {
+            return next(new AppError_1.AppError("All fields are required", 400, {
+                errors: {
+                    email: !email ? "Email is required" : undefined,
+                    password: !password ? "Password is required" : undefined,
+                    name: !name ? "Name is required" : undefined,
+                },
+            }));
+        }
+        // Check email format
+        const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
+        if (!emailRegex.test(email)) {
+            return next(new AppError_1.AppError("Please provide a valid email address", 400));
+        }
+        // Check if email exists
+        const existingUser = yield user_model_1.default.findOne({ email });
+        if (existingUser) {
+            return next(new AppError_1.AppError("Email already exists", 400, {
+                path: "email",
+                value: req.body.email,
+            }));
+        }
+        // Create admin user with verified status
+        const adminUser = yield user_model_1.default.create({
+            name,
+            email,
+            password,
+            role: "admin",
+            isVerified: true, // Auto-verify admin users
+        });
+        res.status(201).json({
+            success: true,
+            message: "Admin user created successfully",
+            user: {
+                _id: adminUser._id,
+                name: adminUser.name,
+                email: adminUser.email,
+                role: adminUser.role,
+                isVerified: adminUser.isVerified,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Admin creation error:", error);
+        return next(new AppError_1.AppError(error.message || "Failed to create admin user", 500));
+    }
+}));
+// For initial admin creation when no admin exists yet (to be used during setup)
+exports.createInitialAdmin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Check if any admin exists in the system
+        const adminExists = yield user_model_1.default.findOne({ role: "admin" });
+        if (adminExists) {
+            return next(new AppError_1.AppError("Admin user already exists. Please use regular admin creation.", 400));
+        }
+        const { name, email, password, setupKey } = req.body;
+        // Validate setup key from environment variable
+        if (setupKey !== process.env.ADMIN_SETUP_KEY) {
+            return next(new AppError_1.AppError("Invalid setup key", 403));
+        }
+        // Validate required fields
+        if (!email || !password || !name) {
+            return next(new AppError_1.AppError("All fields are required", 400));
+        }
+        // Create initial admin user
+        const adminUser = yield user_model_1.default.create({
+            name,
+            email,
+            password,
+            role: "admin",
+            isVerified: true,
+        });
+        res.status(201).json({
+            success: true,
+            message: "Initial admin user created successfully",
+            user: {
+                _id: adminUser._id,
+                name: adminUser.name,
+                email: adminUser.email,
+                role: adminUser.role,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Initial admin creation error:", error);
+        return next(new AppError_1.AppError(error.message || "Failed to create initial admin", 500));
     }
 }));

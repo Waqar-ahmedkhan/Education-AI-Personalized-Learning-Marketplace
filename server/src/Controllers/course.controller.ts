@@ -11,6 +11,8 @@ import Redis from "ioredis";
 import { client } from "../utils/RedisConnect";
 import ejs from "ejs";
 import path from "path";
+import pdf from "pdfkit";
+import { Readable } from "stream";
 import mongoose from "mongoose";
 import sendEmail from "../utils/Sendemail";
 import axios from "axios";
@@ -392,6 +394,136 @@ export const addReview = CatchAsyncError(
   }
 );
 
+// Add this to course.controller.ts
+interface ITrackProgress {
+  courseId: string;
+  contentId: string;
+}
+
+export const trackProgress = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { courseId, contentId }: ITrackProgress = req.body;
+      const userId = req.user?._id;
+
+      const course = await CourseModel.findById(courseId);
+      if (!course) return next(new AppError("Course not found", 404));
+
+      let userProgress = (course as any).progress || [];
+
+      const alreadyExists = userProgress.find(
+        (item: any) =>
+          item.user.toString() === String(userId) &&
+          item.contentId === contentId
+      );
+
+      if (!alreadyExists) {
+        userProgress.push({ user: userId, contentId });
+        (course as any).progress = userProgress;
+        await course.save();
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Progress tracked",
+      });
+    } catch (error: any) {
+      return next(new AppError(error.message, 500));
+    }
+  }
+);
+
+// Generate Certificate if course is completed
+export const generateCertificate = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const courseId = req.params.id;
+      const userId = req.user?._id;
+
+      const course = await CourseModel.findById(courseId);
+      if (!course) return next(new AppError("Course not found", 404));
+
+      const courseContent = course.courseData;
+      const userProgress = (course as any).progress.filter(
+        (item: any) => item.user.toString() === String(userId)
+      );
+
+      const completedCount = userProgress.length;
+      const totalVideos = courseContent.length;
+
+      if (completedCount !== totalVideos) {
+        return next(
+          new AppError("Complete all modules to get certificate", 400)
+        );
+      }
+
+      const certificateId = new mongoose.Types.ObjectId();
+
+      (course as any).certificates = [
+        ...((course as any).certificates || []),
+        {
+          user: userId,
+          issuedAt: new Date(),
+          certificateId,
+        },
+      ];
+
+      await course.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Certificate generated successfully",
+        certificateId,
+      });
+    } catch (error: any) {
+      return next(new AppError(error.message, 500));
+    }
+  }
+);
+
+// Add XP/Badge to Gamification
+export const addGamificationXP = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { courseId, xp }: { courseId: string; xp: number } = req.body;
+      const userId = req.user?._id;
+
+      const course = await CourseModel.findById(courseId);
+      if (!course) return next(new AppError("Course not found", 404));
+
+      let gamification = (course as any).gamification || [];
+
+      if (typeof userId !== "string") {
+        return next(new AppError("Invalid user ID", 400));
+      }
+      let userEntry = gamification.find(
+        (g: any) => g.user.toString() === userId
+      );
+
+      if (!userEntry) {
+        userEntry = { user: userId, xp: 0, badges: [] };
+        gamification.push(userEntry);
+      }
+
+      userEntry.xp += xp;
+
+      if (userEntry.xp >= 100 && !userEntry.badges.includes("Beginner")) {
+        userEntry.badges.push("Beginner");
+      }
+
+      (course as any).gamification = gamification;
+      await course.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Gamification XP added",
+      });
+    } catch (error: any) {
+      return next(new AppError(error.message, 500));
+    }
+  }
+);
+
 interface IAddReviewData {
   comment: string;
   courseId: string;
@@ -476,6 +608,56 @@ export const deleteCourse = CatchAsyncError(
       });
     } catch (error: any) {
       return next(new AppError(error.message, 400));
+    }
+  }
+);
+
+//certicficate
+
+export const downloadCertificatePDF = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const courseId = req.params.id;
+      const userId = req.user?._id;
+      const userName = req.user?.name || "Student";
+
+      const course = await CourseModel.findById(courseId);
+      if (!course) return next(new AppError("Course not found", 404));
+
+      const hasCertificate = (course as any).certificates?.some(
+        (cert: any) => cert.user.toString() === String(userId)
+      );
+
+      if (!hasCertificate) {
+        return next(new AppError("You must complete the course first!", 400));
+      }
+
+      const html = await ejs.renderFile(
+        path.join(__dirname, "../mails/certificate-template.ejs"),
+        {
+          userName,
+          courseName: course.name,
+          date: new Date().toDateString(),
+        }
+      );
+
+      const doc = new pdf();
+      const stream = new Readable();
+      stream._read = () => {};
+      stream.push(html);
+      stream.push(null);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=certificate-${course.name}.pdf`
+      );
+
+      doc.text(html);
+      doc.pipe(res);
+      doc.end();
+    } catch (error: any) {
+      return next(new AppError(error.message, 500));
     }
   }
 );

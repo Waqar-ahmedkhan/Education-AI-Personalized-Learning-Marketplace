@@ -28,15 +28,15 @@ const mongoose_1 = __importStar(require("mongoose"));
 const orderSchema = new mongoose_1.Schema({
     userId: {
         type: String,
-        required: true
+        required: true,
     },
     courseId: {
         type: String,
-        required: true
+        required: true,
     },
     payment_info: {
         type: Object,
-        required: true
-    }
+        required: true,
+    },
 }, { timestamps: true });
 exports.OrderModel = mongoose_1.default.model("OrderModel", orderSchema);

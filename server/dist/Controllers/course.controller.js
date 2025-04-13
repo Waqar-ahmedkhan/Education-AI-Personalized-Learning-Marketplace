@@ -88,7 +88,7 @@ exports.GetSingleCourse = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next
         }
         else {
             const course = yield Course_model_1.default.findById(courseId).select("-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links");
-            yield RedisConnect_1.client.set(courseId, JSON.stringify(course), { "EX": 6048000 });
+            yield RedisConnect_1.client.set(courseId, JSON.stringify(course), { EX: 6048000 });
             if (!course) {
                 return next(new AppError_1.AppError("Course not found", 404));
             }
@@ -270,7 +270,7 @@ exports.addReview = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => _
             course.rating = avg / course.reviews.length; // one example we have 2 reviews one is 5 another one is 4 so math working like this = 9 / 2  = 4.5 ratings
         }
         yield (course === null || course === void 0 ? void 0 : course.save());
-        yield RedisConnect_1.client.set(courseId, JSON.stringify(course), { "EX": 604800 }); // 7days
+        yield RedisConnect_1.client.set(courseId, JSON.stringify(course), { EX: 604800 }); // 7days
         // create notification
         yield Notification_model_1.NotificaModel.create({
             user: (_b = req.user) === null || _b === void 0 ? void 0 : _b._id,
@@ -309,7 +309,7 @@ exports.addReplyToReview = (0, CatchAsyncError_1.CatchAsyncError)((req, res, nex
         }
         (_b = review.CommentReplies) === null || _b === void 0 ? void 0 : _b.push(replyData);
         yield (course === null || course === void 0 ? void 0 : course.save());
-        yield RedisConnect_1.client.set(courseId, JSON.stringify(course), { "EX": 604800 }); // 7days
+        yield RedisConnect_1.client.set(courseId, JSON.stringify(course), { EX: 604800 }); // 7days
         res.status(200).json({
             success: true,
             course,

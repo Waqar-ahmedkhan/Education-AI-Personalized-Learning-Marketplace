@@ -4,7 +4,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 require("dotenv").config();
 
 // Interface for User, including progress and interaction tracking
-interface IUser extends Document {
+export interface IUser extends Document {
   name: string;
   email: string;
   password: string;

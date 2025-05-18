@@ -145,11 +145,11 @@
 // export default CourseModel;
 
 import mongoose, { Document, Schema } from "mongoose";
-import { IUserInput } from "./user.model";
+import  { IUser } from  "./user.model";
 
 // Define the IComment interface
 export interface IComment extends Document {
-  user: IUserInput;
+  user: IUser;
   question: string;
   questionReplies: IComment[];
   createdAt: Date;

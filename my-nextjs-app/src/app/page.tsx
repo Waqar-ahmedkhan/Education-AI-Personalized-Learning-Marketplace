@@ -1,4 +1,3 @@
-import Footer from "@/components/layout/Footer";
 import TestimonialsSection from "@/components/layout/Testimonial";
 import CommunityHero from "@/components/ui/Communityhero";
 import HeroSection from "@/components/ui/HeroPage";
@@ -11,7 +10,6 @@ export default function Page() {
       <WhatsAppButton />
       <CommunityHero />
       <TestimonialsSection />
-      <Footer />
     </>
   );
 }

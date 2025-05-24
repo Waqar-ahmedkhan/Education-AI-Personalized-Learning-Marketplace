@@ -18,7 +18,8 @@ export const app = express();
 // Middlewares
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(cors({ origin: process.env.ORIGIN_URL }));
+// app.use(cors({ origin: process.env.ORIGIN_URL }));
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(cookieParser());
 
 //connectDbs

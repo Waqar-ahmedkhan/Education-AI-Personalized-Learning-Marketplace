@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
 
 const Navbar = () => {
   const pathname = usePathname();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

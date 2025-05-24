@@ -35,17 +35,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const mongoose_1 = __importStar(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const mongoose_1 = __importStar(require("mongoose"));
 require("dotenv").config();
 // User Schema definition
-// Enhanced User Schema
 const userSchema = new mongoose_1.Schema({
-    name: {
-        type: String,
-        required: [true, "Please enter your name"],
-    },
+    name: { type: String, required: [true, "Please enter your name"] },
     email: {
         type: String,
         required: [true, "Please enter your email"],
@@ -61,34 +57,57 @@ const userSchema = new mongoose_1.Schema({
         type: String,
         required: [true, "Please enter your password"],
         minlength: [6, "Password must be at least 6 characters"],
-        select: false,
+        select: false, // Don't return password in queries
     },
     avatar: {
-        public_id: String,
-        url: String,
+        public_id: { type: String, required: false },
+        url: { type: String, required: false },
     },
     role: {
         type: String,
         default: "user",
         enum: ["user", "admin", "instructor"],
+        required: [true, "Please specify a role"], // Made role required
     },
     isVerified: {
         type: Boolean,
         default: false,
     },
-    courses: [
-        {
-            courseId: { type: String, required: true },
-        },
-    ],
+    courses: [{ courseId: { type: String, required: true } }],
     preferences: {
         type: [String],
-        default: [], // User's topic preferences
+        default: [],
+        required: [true, "Please select at least one preference"], // Ensures at least one preference
     },
     recommendedCourses: [
         {
+            courseId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "Course", required: true }, // Make courseId required
+            score: { type: Number, default: 0, required: true }, // Ensure score is always present
+        },
+    ],
+    // New fields for course progress and interaction history
+    courseProgress: [
+        {
             courseId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "Course" },
-            score: { type: Number, default: 0 }, // Recommendation score
+            progress: Number,
+            completedLessons: [String],
+            lastAccessed: Date,
+            quizScores: [
+                {
+                    quizId: String,
+                    score: Number,
+                    attemptDate: Date,
+                },
+            ],
+        },
+    ],
+    interactionHistory: [
+        {
+            courseId: { type: mongoose_1.default.Schema.Types.ObjectId, ref: "Course" },
+            action: String, // 'viewed', 'quiz-started', 'quiz-completed'
+            section: String,
+            timestamp: { type: Date, default: Date.now },
+            duration: Number,
         },
     ],
 }, {
@@ -102,7 +121,9 @@ userSchema.methods.SignAccessToken = function () {
 };
 // Sign Refresh Token
 userSchema.methods.SignRefreshToken = function () {
-    return jsonwebtoken_1.default.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || "7d" });
+    return jsonwebtoken_1.default.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
+        expiresIn: process.env.REFRESH_TOKEN_EXPIRE || "7d",
+    });
 };
 // Hash Password Before Saving
 userSchema.pre("save", function (next) {

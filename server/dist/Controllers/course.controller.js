@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateVideoUrl = exports.deleteCourse = exports.getAdminAllCourses = exports.addReplyToReview = exports.addReview = exports.addAnswer = exports.addQuestion = exports.getCoursesbyUser = exports.getallCourses = exports.GetSingleCourse = exports.editCourse = exports.uploadCourse = void 0;
+exports.generateVideoUrl = exports.downloadCertificatePDF = exports.deleteCourse = exports.getAdminAllCourses = exports.addReplyToReview = exports.addGamificationXP = exports.generateCertificate = exports.trackProgress = exports.addReview = exports.addAnswer = exports.addQuestion = exports.getCoursesbyUser = exports.getallCourses = exports.GetSingleCourse = exports.editCourse = exports.uploadCourse = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const AppError_1 = require("../utils/AppError");
 const cloudinary_1 = __importDefault(require("cloudinary"));
@@ -21,6 +21,8 @@ const Course_model_1 = __importDefault(require("../models/Course.model"));
 const RedisConnect_1 = require("../utils/RedisConnect");
 const ejs_1 = __importDefault(require("ejs"));
 const path_1 = __importDefault(require("path"));
+const pdfkit_1 = __importDefault(require("pdfkit"));
+const stream_1 = require("stream");
 const mongoose_1 = __importDefault(require("mongoose"));
 const Sendemail_1 = __importDefault(require("../utils/Sendemail"));
 const axios_1 = __importDefault(require("axios"));
@@ -286,6 +288,100 @@ exports.addReview = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => _
         return next(new AppError_1.AppError(error.message, 500));
     }
 }));
+exports.trackProgress = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { courseId, contentId } = req.body;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const course = yield Course_model_1.default.findById(courseId);
+        if (!course)
+            return next(new AppError_1.AppError("Course not found", 404));
+        let userProgress = course.progress || [];
+        const alreadyExists = userProgress.find((item) => item.user.toString() === String(userId) &&
+            item.contentId === contentId);
+        if (!alreadyExists) {
+            userProgress.push({ user: userId, contentId });
+            course.progress = userProgress;
+            yield course.save();
+        }
+        res.status(200).json({
+            success: true,
+            message: "Progress tracked",
+        });
+    }
+    catch (error) {
+        return next(new AppError_1.AppError(error.message, 500));
+    }
+}));
+// Generate Certificate if course is completed
+exports.generateCertificate = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const courseId = req.params.id;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const course = yield Course_model_1.default.findById(courseId);
+        if (!course)
+            return next(new AppError_1.AppError("Course not found", 404));
+        const courseContent = course.courseData;
+        const userProgress = course.progress.filter((item) => item.user.toString() === String(userId));
+        const completedCount = userProgress.length;
+        const totalVideos = courseContent.length;
+        if (completedCount !== totalVideos) {
+            return next(new AppError_1.AppError("Complete all modules to get certificate", 400));
+        }
+        const certificateId = new mongoose_1.default.Types.ObjectId();
+        course.certificates = [
+            ...(course.certificates || []),
+            {
+                user: userId,
+                issuedAt: new Date(),
+                certificateId,
+            },
+        ];
+        yield course.save();
+        res.status(200).json({
+            success: true,
+            message: "Certificate generated successfully",
+            certificateId,
+        });
+    }
+    catch (error) {
+        return next(new AppError_1.AppError(error.message, 500));
+    }
+}));
+// Add XP/Badge to Gamification
+exports.addGamificationXP = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { courseId, xp } = req.body;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const course = yield Course_model_1.default.findById(courseId);
+        if (!course)
+            return next(new AppError_1.AppError("Course not found", 404));
+        let gamification = course.gamification || [];
+        if (typeof userId !== "string") {
+            return next(new AppError_1.AppError("Invalid user ID", 400));
+        }
+        let userEntry = gamification.find((g) => g.user.toString() === userId);
+        if (!userEntry) {
+            userEntry = { user: userId, xp: 0, badges: [] };
+            gamification.push(userEntry);
+        }
+        userEntry.xp += xp;
+        if (userEntry.xp >= 100 && !userEntry.badges.includes("Beginner")) {
+            userEntry.badges.push("Beginner");
+        }
+        course.gamification = gamification;
+        yield course.save();
+        res.status(200).json({
+            success: true,
+            message: "Gamification XP added",
+        });
+    }
+    catch (error) {
+        return next(new AppError_1.AppError(error.message, 500));
+    }
+}));
 exports.addReplyToReview = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
@@ -345,6 +441,40 @@ exports.deleteCourse = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
     }
     catch (error) {
         return next(new AppError_1.AppError(error.message, 400));
+    }
+}));
+//certicficate
+exports.downloadCertificatePDF = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    try {
+        const courseId = req.params.id;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const userName = ((_b = req.user) === null || _b === void 0 ? void 0 : _b.name) || "Student";
+        const course = yield Course_model_1.default.findById(courseId);
+        if (!course)
+            return next(new AppError_1.AppError("Course not found", 404));
+        const hasCertificate = (_c = course.certificates) === null || _c === void 0 ? void 0 : _c.some((cert) => cert.user.toString() === String(userId));
+        if (!hasCertificate) {
+            return next(new AppError_1.AppError("You must complete the course first!", 400));
+        }
+        const html = yield ejs_1.default.renderFile(path_1.default.join(__dirname, "../mails/certificate-template.ejs"), {
+            userName,
+            courseName: course.name,
+            date: new Date().toDateString(),
+        });
+        const doc = new pdfkit_1.default();
+        const stream = new stream_1.Readable();
+        stream._read = () => { };
+        stream.push(html);
+        stream.push(null);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename=certificate-${course.name}.pdf`);
+        doc.text(html);
+        doc.pipe(res);
+        doc.end();
+    }
+    catch (error) {
+        return next(new AppError_1.AppError(error.message, 500));
     }
 }));
 // generate video url

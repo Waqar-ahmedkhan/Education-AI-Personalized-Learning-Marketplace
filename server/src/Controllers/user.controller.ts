@@ -64,74 +64,122 @@ export const createActivationToken = (
   return { token, activationCode };
 };
 
+
 export const registerUser = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { name, email, password } = req.body as IRegistrationBody;
 
-      // Validate required fields
-      if (!email || !password || !name) {
-        return next(
-          new AppError("Validation failed", 400, {
-            errors: {
-              email: !email ? "Email is required" : undefined,
-              password: !password ? "Password is required" : undefined,
-              name: !name ? "Name is required" : undefined,
-            },
-          })
-        );
+      // Comprehensive validation with detailed error messages
+      const validationErrors: Record<string, string> = {};
+
+      // Name validation
+      if (!name || typeof name !== 'string') {
+        validationErrors.name = "Name is required";
+      } else if (name.trim().length < 2) {
+        validationErrors.name = "Name must be at least 2 characters long";
+      } else if (name.trim().length > 50) {
+        validationErrors.name = "Name must not exceed 50 characters";
+      } else if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
+        validationErrors.name = "Name can only contain letters and spaces";
       }
 
-      // Check email format
-      const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
-      if (!emailRegex.test(email)) {
-        return next(new AppError("Please provide a valid email address", 400));
+      // Email validation
+      if (!email || typeof email !== 'string') {
+        validationErrors.email = "Email is required";
+      } else {
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(email.trim().toLowerCase())) {
+          validationErrors.email = "Please provide a valid email address";
+        } else if (email.length > 100) {
+          validationErrors.email = "Email must not exceed 100 characters";
+        }
       }
 
-      // Check if email exists
-      const existingUser = await UserModel.findOne({ email });
-      if (existingUser) {
-        res.json({
-          status: "400",
-          message: "Email already exists",
-          path: "email",
-          value: req.body.email,
+      // Password validation
+      if (!password || typeof password !== 'string') {
+        validationErrors.password = "Password is required";
+      } else if (password.length < 8) {
+        validationErrors.password = "Password must be at least 8 characters long";
+      } else if (password.length > 128) {
+        validationErrors.password = "Password must not exceed 128 characters";
+      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password)) {
+        validationErrors.password = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character";
+      }
+
+      // Return validation errors if any
+      if (Object.keys(validationErrors).length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: validationErrors
         });
-        return next(
-          new AppError("Email already exists", 400, {
-            path: "email",
-            value: req.body.email,
-          })
-        );
+      }
+
+      // Normalize email
+      const normalizedEmail = email.trim().toLowerCase();
+      const trimmedName = name.trim();
+
+      // Check if user already exists
+      let existingUser;
+      try {
+        existingUser = await UserModel.findOne({ 
+          email: normalizedEmail 
+        }).select('email');
+      } catch (dbError: any) {
+        console.error("Database query error:", dbError);
+        return res.status(500).json({
+          success: false,
+          message: "Database connection error. Please try again later."
+        });
+      }
+
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message: "An account with this email already exists",
+          errors: {
+            email: "This email is already registered. Please use a different email or try logging in."
+          }
+        });
       }
 
       // Create user input object
       const userInput: IRegistrationBody = {
-        name,
-        email,
-        password,
+        name: trimmedName,
+        email: normalizedEmail,
+        password: password, // Keep original password for hashing
       };
 
-      // Generate activation token
+      // Generate activation token with error handling
       let activationToken;
       try {
         activationToken = createActivationToken(userInput);
+        
+        // Validate token creation
+        if (!activationToken || !activationToken.token || !activationToken.activationCode) {
+          throw new Error("Invalid token structure generated");
+        }
       } catch (tokenError: any) {
         console.error("Token creation error:", tokenError);
-        return next(
-          new AppError(
-            tokenError.message || "Failed to create activation token",
-            500
-          )
-        );
+        return res.status(500).json({
+          success: false,
+          message: "Failed to generate activation code. Please try again."
+        });
       }
 
-      // Prepare email data
+      // Prepare email data with proper structure
       const emailData = {
-        user: { name: userInput.name },
+        user: { 
+          name: userInput.name,
+          email: userInput.email 
+        },
         activationCode: activationToken.activationCode,
+        appName: "EduAI",
+        supportEmail: process.env.SUPPORT_EMAIL || "support@eduai.com"
       };
 
+      // Send activation email with comprehensive error handling
       try {
         await sendEmail({
           email: userInput.email,
@@ -141,24 +189,166 @@ export const registerUser = CatchAsyncError(
         });
       } catch (emailError: any) {
         console.error("Email sending error:", emailError);
-        return next(new AppError("Failed to send activation email", 500));
+        
+        // Different error messages based on email error type
+        let emailErrorMessage = "Failed to send activation email";
+        
+        if (emailError.code === 'ENOTFOUND') {
+          emailErrorMessage = "Email service temporarily unavailable";
+        } else if (emailError.responseCode === 550) {
+          emailErrorMessage = "Invalid email address provided";
+        } else if (emailError.responseCode === 554) {
+          emailErrorMessage = "Email rejected by recipient server";
+        }
+        
+        return res.status(500).json({
+          success: false,
+          message: `${emailErrorMessage}. Please try again or contact support.`
+        });
       }
+
+      // Log successful registration (without sensitive data)
+      console.log(`User registration initiated for email: ${userInput.email}`);
 
       // Success response
       return res.status(201).json({
         success: true,
-        message:
-          "Registration successful! Please check your email for activation code.",
+        message: "Registration successful! Please check your email for the activation code.",
         activationToken: activationToken.token,
+        data: {
+          email: userInput.email,
+          name: userInput.name
+        }
       });
+
     } catch (error: any) {
       console.error("Registration error:", error);
-      if (!res.headersSent) {
-        return next(new AppError(error.message || "Registration failed", 500));
+      
+      // Ensure headers aren't already sent
+      if (res.headersSent) {
+        return;
       }
+
+      // Handle different types of errors
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({
+          success: false,
+          message: "Validation error occurred",
+          errors: error.errors
+        });
+      }
+
+      if (error.name === 'MongoError' || error.name === 'MongooseError') {
+        return res.status(500).json({
+          success: false,
+          message: "Database error. Please try again later."
+        });
+      }
+
+      // Generic error response
+      return res.status(500).json({
+        success: false,
+        message: "An unexpected error occurred. Please try again later."
+      });
     }
   }
 );
+
+// export const registerUser = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const { name, email, password } = req.body as IRegistrationBody;
+
+//       // Validate required fields
+//       if (!email || !password || !name) {
+//         return next(
+//           new AppError("Validation failed", 400, {
+//             errors: {
+//               email: !email ? "Email is required" : undefined,
+//               password: !password ? "Password is required" : undefined,
+//               name: !name ? "Name is required" : undefined,
+//             },
+//           })
+//         );
+//       }
+
+//       // Check email format
+//       const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
+//       if (!emailRegex.test(email)) {
+//         return next(new AppError("Please provide a valid email address", 400));
+//       }
+
+//       // Check if email exists
+//       const existingUser = await UserModel.findOne({ email });
+//       if (existingUser) {
+//         res.json({
+//           status: "400",
+//           message: "Email already exists",
+//           path: "email",
+//           value: req.body.email,
+//         });
+//         return next(
+//           new AppError("Email already exists", 400, {
+//             path: "email",
+//             value: req.body.email,
+//           })
+//         );
+//       }
+
+//       // Create user input object
+//       const userInput: IRegistrationBody = {
+//         name,
+//         email,
+//         password,
+//       };
+
+//       // Generate activation token
+//       let activationToken;
+//       try {
+//         activationToken = createActivationToken(userInput);
+//       } catch (tokenError: any) {
+//         console.error("Token creation error:", tokenError);
+//         return next(
+//           new AppError(
+//             tokenError.message || "Failed to create activation token",
+//             500
+//           )
+//         );
+//       }
+
+//       // Prepare email data
+//       const emailData = {
+//         user: { name: userInput.name },
+//         activationCode: activationToken.activationCode,
+//       };
+
+//       try {
+//         await sendEmail({
+//           email: userInput.email,
+//           subject: "Account Activation - EduAI",
+//           template: "activation-code.ejs",
+//           data: emailData,
+//         });
+//       } catch (emailError: any) {
+//         console.error("Email sending error:", emailError);
+//         return next(new AppError("Failed to send activation email", 500));
+//       }
+
+//       // Success response
+//       return res.status(201).json({
+//         success: true,
+//         message:
+//           "Registration successful! Please check your email for activation code.",
+//         activationToken: activationToken.token,
+//       });
+//     } catch (error: any) {
+//       console.error("Registration error:", error);
+//       if (!res.headersSent) {
+//         return next(new AppError(error.message || "Registration failed", 500));
+//       }
+//     }
+//   }
+// );
 
 export const activateUser = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {

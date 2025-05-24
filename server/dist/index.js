@@ -21,7 +21,8 @@ exports.app = (0, express_1.default)();
 // Middlewares
 exports.app.use(express_1.default.json());
 exports.app.use(body_parser_1.default.urlencoded({ extended: true }));
-exports.app.use((0, cors_1.default)({ origin: process.env.ORIGIN_URL }));
+// app.use(cors({ origin: process.env.ORIGIN_URL }));
+exports.app.use((0, cors_1.default)({ origin: 'http://localhost:3000', credentials: true }));
 exports.app.use((0, cookie_parser_1.default)());
 //connectDbs
 (0, RedisConnect_1.connectRedis)();

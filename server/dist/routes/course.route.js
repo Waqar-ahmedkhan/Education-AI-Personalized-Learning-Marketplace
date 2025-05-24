@@ -19,4 +19,11 @@ courseRouter.put("/add-review/:id", auth_1.isAuthenticated, course_controller_1.
 courseRouter.put("/add-reply", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), course_controller_1.addReplyToReview);
 courseRouter.get("/get-courses", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.getallUsers);
 courseRouter.delete("delete-course", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), course_controller_1.deleteCourse);
+// Track video/module progress
+courseRouter.post("/track-progress", auth_1.isAuthenticated, course_controller_1.trackProgress);
+// Generate certificate (if course completed)
+courseRouter.post("/generate-certificate/:id", auth_1.isAuthenticated, course_controller_1.generateCertificate);
+// Add XP/badges to user's gamification record
+courseRouter.post("/add-xp", auth_1.isAuthenticated, course_controller_1.addGamificationXP);
+courseRouter.get("/download-certificate/:id", auth_1.isAuthenticated, course_controller_1.downloadCertificatePDF);
 exports.default = courseRouter;

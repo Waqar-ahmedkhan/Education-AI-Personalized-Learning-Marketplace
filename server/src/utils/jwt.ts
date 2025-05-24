@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { IUserInput } from "../models/user.model";
+import { IUser } from "../models/user.model";
 import { client } from "./RedisConnect"; // Assuming Redis client is configured in a separate file
 require("dotenv").config();
 
@@ -37,7 +37,7 @@ export const refreshTokenOptions: ItokenOptions = {
 
 
 export const sendToken = async (
-  user: IUserInput,
+  user: IUser,
   statusCode: number,
   res: Response
 ) => {

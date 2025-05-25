@@ -10,8 +10,15 @@ import ejs from "ejs";
 import { getAllOrdersService, newOrder } from "../services/order.services";
 import sendEmail from "../utils/Sendemail";
 import { NotificaModel } from "../models/Notification.model";
-require("dotenv").config();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+import dotenv from "dotenv";
+dotenv.config();
+const stripe = require("stripe")("sk_test_4eCk2jJ6v0x1q3z2g5f8Q6JX");
+
+console.log("Stripe key:", process.env.STRIPE_SECRET_KEY); // Add this before stripe init
+// const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
+
+// const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 // create order
 export const createOrder = CatchAsyncError(

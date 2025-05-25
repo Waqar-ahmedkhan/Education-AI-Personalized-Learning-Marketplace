@@ -4,6 +4,10 @@ env
 dockerignore
 Dockerfile
 docker-compose.yml
+docker-compose.override.yml
+docker-compose.yml
+
 // .env
 // .env.local
+
 // .env.development

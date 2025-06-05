@@ -104,7 +104,7 @@ const Navbar = () => {
           </button>
 
           <Link
-            href="/login"
+            href="/auth/login"
             className="px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-lg transition-colors"
             aria-label="Log in to EduAI"
           >

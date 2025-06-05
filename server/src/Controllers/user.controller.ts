@@ -64,7 +64,6 @@ export const createActivationToken = (
   return { token, activationCode };
 };
 
-
 export const registerUser = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -74,7 +73,7 @@ export const registerUser = CatchAsyncError(
       const validationErrors: Record<string, string> = {};
 
       // Name validation
-      if (!name || typeof name !== 'string') {
+      if (!name || typeof name !== "string") {
         validationErrors.name = "Name is required";
       } else if (name.trim().length < 2) {
         validationErrors.name = "Name must be at least 2 characters long";
@@ -85,7 +84,7 @@ export const registerUser = CatchAsyncError(
       }
 
       // Email validation
-      if (!email || typeof email !== 'string') {
+      if (!email || typeof email !== "string") {
         validationErrors.email = "Email is required";
       } else {
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -97,14 +96,20 @@ export const registerUser = CatchAsyncError(
       }
 
       // Password validation
-      if (!password || typeof password !== 'string') {
+      if (!password || typeof password !== "string") {
         validationErrors.password = "Password is required";
       } else if (password.length < 8) {
-        validationErrors.password = "Password must be at least 8 characters long";
+        validationErrors.password =
+          "Password must be at least 8 characters long";
       } else if (password.length > 128) {
         validationErrors.password = "Password must not exceed 128 characters";
-      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password)) {
-        validationErrors.password = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character";
+      } else if (
+        !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(
+          password
+        )
+      ) {
+        validationErrors.password =
+          "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character";
       }
 
       // Return validation errors if any
@@ -112,7 +117,7 @@ export const registerUser = CatchAsyncError(
         return res.status(400).json({
           success: false,
           message: "Validation failed",
-          errors: validationErrors
+          errors: validationErrors,
         });
       }
 
@@ -123,14 +128,14 @@ export const registerUser = CatchAsyncError(
       // Check if user already exists
       let existingUser;
       try {
-        existingUser = await UserModel.findOne({ 
-          email: normalizedEmail 
-        }).select('email');
+        existingUser = await UserModel.findOne({
+          email: normalizedEmail,
+        }).select("email");
       } catch (dbError: any) {
         console.error("Database query error:", dbError);
         return res.status(500).json({
           success: false,
-          message: "Database connection error. Please try again later."
+          message: "Database connection error. Please try again later.",
         });
       }
 
@@ -139,8 +144,9 @@ export const registerUser = CatchAsyncError(
           success: false,
           message: "An account with this email already exists",
           errors: {
-            email: "This email is already registered. Please use a different email or try logging in."
-          }
+            email:
+              "This email is already registered. Please use a different email or try logging in.",
+          },
         });
       }
 
@@ -155,28 +161,32 @@ export const registerUser = CatchAsyncError(
       let activationToken;
       try {
         activationToken = createActivationToken(userInput);
-        
+
         // Validate token creation
-        if (!activationToken || !activationToken.token || !activationToken.activationCode) {
+        if (
+          !activationToken ||
+          !activationToken.token ||
+          !activationToken.activationCode
+        ) {
           throw new Error("Invalid token structure generated");
         }
       } catch (tokenError: any) {
         console.error("Token creation error:", tokenError);
         return res.status(500).json({
           success: false,
-          message: "Failed to generate activation code. Please try again."
+          message: "Failed to generate activation code. Please try again.",
         });
       }
 
       // Prepare email data with proper structure
       const emailData = {
-        user: { 
+        user: {
           name: userInput.name,
-          email: userInput.email 
+          email: userInput.email,
         },
         activationCode: activationToken.activationCode,
         appName: "EduAI",
-        supportEmail: process.env.SUPPORT_EMAIL || "support@eduai.com"
+        supportEmail: process.env.SUPPORT_EMAIL || "support@eduai.com",
       };
 
       // Send activation email with comprehensive error handling
@@ -189,21 +199,21 @@ export const registerUser = CatchAsyncError(
         });
       } catch (emailError: any) {
         console.error("Email sending error:", emailError);
-        
+
         // Different error messages based on email error type
         let emailErrorMessage = "Failed to send activation email";
-        
-        if (emailError.code === 'ENOTFOUND') {
+
+        if (emailError.code === "ENOTFOUND") {
           emailErrorMessage = "Email service temporarily unavailable";
         } else if (emailError.responseCode === 550) {
           emailErrorMessage = "Invalid email address provided";
         } else if (emailError.responseCode === 554) {
           emailErrorMessage = "Email rejected by recipient server";
         }
-        
+
         return res.status(500).json({
           success: false,
-          message: `${emailErrorMessage}. Please try again or contact support.`
+          message: `${emailErrorMessage}. Please try again or contact support.`,
         });
       }
 
@@ -213,42 +223,42 @@ export const registerUser = CatchAsyncError(
       // Success response
       return res.status(201).json({
         success: true,
-        message: "Registration successful! Please check your email for the activation code.",
+        message:
+          "Registration successful! Please check your email for the activation code.",
         activationToken: activationToken.token,
         data: {
           email: userInput.email,
-          name: userInput.name
-        }
+          name: userInput.name,
+        },
       });
-
     } catch (error: any) {
       console.error("Registration error:", error);
-      
+
       // Ensure headers aren't already sent
       if (res.headersSent) {
         return;
       }
 
       // Handle different types of errors
-      if (error.name === 'ValidationError') {
+      if (error.name === "ValidationError") {
         return res.status(400).json({
           success: false,
           message: "Validation error occurred",
-          errors: error.errors
+          errors: error.errors,
         });
       }
 
-      if (error.name === 'MongoError' || error.name === 'MongooseError') {
+      if (error.name === "MongoError" || error.name === "MongooseError") {
         return res.status(500).json({
           success: false,
-          message: "Database error. Please try again later."
+          message: "Database error. Please try again later.",
         });
       }
 
       // Generic error response
       return res.status(500).json({
         success: false,
-        message: "An unexpected error occurred. Please try again later."
+        message: "An unexpected error occurred. Please try again later.",
       });
     }
   }
@@ -350,56 +360,264 @@ export const registerUser = CatchAsyncError(
 //   }
 // );
 
+// export const activateUser = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const { activation_token, activation_code } =
+//         req.body as IActivationRequest;
+
+//       // Verify the activation token
+//       const decoded = jwt.verify(
+//         activation_token,
+//         process.env.ACTIVATION_SECRET as Secret
+//       ) as { user: IRegistrationBody; activationCode: string };
+
+//       // Verify activation code
+//       if (decoded.activationCode !== activation_code) {
+//         return next(new AppError("Invalid activation code", 400));
+//       }
+
+//       const { email, name, password } = decoded.user;
+
+//       // Check if user already exists
+//       const existingUser = await UserModel.findOne({ email });
+//       if (existingUser) {
+//         return next(new AppError("Email already exists", 400));
+//       }
+
+//       // Create the user
+//       const user = await UserModel.create({
+//         name,
+//         email,
+//         password,
+//       });
+
+//       res.status(201).json({
+//         success: true,
+//         message: "User activated successfully",
+//         user,
+//       });
+//     } catch (error: any) {
+//       console.error("Activation error:", error);
+//       if (error.name === "JsonWebTokenError") {
+//         return next(new AppError("Invalid activation token", 400));
+//       }
+//       if (error.name === "TokenExpiredError") {
+//         return next(new AppError("Activation token has expired", 400));
+//       }
+//       return next(new AppError("Failed to activate user", 500));
+//     }
+//   }
+// );
+
 export const activateUser = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { activation_token, activation_code } =
         req.body as IActivationRequest;
 
-      // Verify the activation token
-      const decoded = jwt.verify(
-        activation_token,
-        process.env.ACTIVATION_SECRET as Secret
-      ) as { user: IRegistrationBody; activationCode: string };
+      // Validate input
+      if (!activation_token) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Activation link is invalid or expired. Please request a new activation code.",
+          errorCode: "MISSING_TOKEN",
+        });
+      }
 
-      // Verify activation code
-      if (decoded.activationCode !== activation_code) {
-        return next(new AppError("Invalid activation code", 400));
+      if (!activation_code) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Please enter the 4-digit activation code sent to your email.",
+          errorCode: "MISSING_CODE",
+        });
+      }
+
+      // Validate activation code format
+      if (!/^\d{4}$/.test(activation_code.trim())) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Activation code must be exactly 4 digits. Please check your email for the correct code.",
+          errorCode: "INVALID_CODE_FORMAT",
+        });
+      }
+
+      let decoded: { user: IRegistrationBody; activationCode: string };
+
+      try {
+        // Verify the activation token
+        decoded = jwt.verify(
+          activation_token,
+          process.env.ACTIVATION_SECRET as Secret
+        ) as { user: IRegistrationBody; activationCode: string };
+      } catch (jwtError: any) {
+        console.error("JWT verification error:", jwtError);
+
+        if (jwtError.name === "TokenExpiredError") {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Your activation code has expired. Please request a new activation code to continue.",
+            errorCode: "TOKEN_EXPIRED",
+            action: "REQUEST_NEW_CODE",
+          });
+        }
+
+        if (jwtError.name === "JsonWebTokenError") {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Invalid activation link. Please use the latest activation email or request a new code.",
+            errorCode: "INVALID_TOKEN",
+            action: "REQUEST_NEW_CODE",
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          message:
+            "Activation link is corrupted or invalid. Please request a new activation code.",
+          errorCode: "TOKEN_ERROR",
+          action: "REQUEST_NEW_CODE",
+        });
+      }
+
+      // Verify activation code matches
+      if (decoded.activationCode !== activation_code.trim()) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "The activation code you entered is incorrect. Please check your email and try again.",
+          errorCode: "CODE_MISMATCH",
+          action: "RETRY_CODE",
+        });
       }
 
       const { email, name, password } = decoded.user;
 
-      // Check if user already exists
-      const existingUser = await UserModel.findOne({ email });
-      if (existingUser) {
-        return next(new AppError("Email already exists", 400));
+      // Validate decoded user data
+      if (!email || !name || !password) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Activation data is incomplete. Please register again or contact support.",
+          errorCode: "INCOMPLETE_DATA",
+          action: "REGISTER_AGAIN",
+        });
       }
 
-      // Create the user
-      const user = await UserModel.create({
-        name,
-        email,
-        password,
-      });
+      try {
+        // Check if user already exists
+        const existingUser = await UserModel.findOne({ email });
+        if (existingUser) {
+          // Check if user is already verified
+          if (existingUser.isVerified) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "This account is already activated. You can log in directly.",
+              errorCode: "ALREADY_ACTIVATED",
+              action: "GO_TO_LOGIN",
+            });
+          } else {
+            // User exists but not verified, update verification status
+            existingUser.isVerified = true;
+            await existingUser.save();
 
-      res.status(201).json({
-        success: true,
-        message: "User activated successfully",
-        user,
-      });
+            return res.status(200).json({
+              success: true,
+              message: "Account activated successfully! You can now log in.",
+              user: {
+                name: existingUser.name,
+                email: existingUser.email,
+                role: existingUser.role,
+                isVerified: existingUser.isVerified,
+              },
+            });
+          }
+        }
+
+        // Create new user
+        const user = await UserModel.create({
+          name,
+          email,
+          password,
+          isVerified: true, // Set as verified since they completed activation
+        });
+
+        res.status(201).json({
+          success: true,
+          message:
+            "Account activated successfully! Welcome aboard. You can now log in.",
+          user: {
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            isVerified: user.isVerified,
+          },
+        });
+      } catch (dbError: any) {
+        console.error("Database error during activation:", dbError);
+
+        if (dbError.code === 11000) {
+          // MongoDB duplicate key error
+          return res.status(400).json({
+            success: false,
+            message:
+              "An account with this email already exists. Try logging in instead.",
+            errorCode: "DUPLICATE_EMAIL",
+            action: "GO_TO_LOGIN",
+          });
+        }
+
+        return res.status(500).json({
+          success: false,
+          message:
+            "We're having trouble activating your account right now. Please try again in a few minutes.",
+          errorCode: "DATABASE_ERROR",
+          action: "RETRY_LATER",
+        });
+      }
     } catch (error: any) {
-      console.error("Activation error:", error);
-      if (error.name === "JsonWebTokenError") {
-        return next(new AppError("Invalid activation token", 400));
+      console.error("Unexpected activation error:", error);
+
+      // Handle specific known errors
+      if (error.message?.includes("validation")) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "The information provided is not valid. Please check and try again.",
+          errorCode: "VALIDATION_ERROR",
+        });
       }
-      if (error.name === "TokenExpiredError") {
-        return next(new AppError("Activation token has expired", 400));
+
+      if (
+        error.message?.includes("network") ||
+        error.message?.includes("timeout")
+      ) {
+        return res.status(500).json({
+          success: false,
+          message:
+            "Network issue detected. Please check your connection and try again.",
+          errorCode: "NETWORK_ERROR",
+          action: "RETRY",
+        });
       }
-      return next(new AppError("Failed to activate user", 500));
+
+      // Generic error
+      return res.status(500).json({
+        success: false,
+        message:
+          "Something went wrong while activating your account. Please try again or contact support if the problem persists.",
+        errorCode: "INTERNAL_ERROR",
+        action: "RETRY_OR_CONTACT_SUPPORT",
+      });
     }
   }
 );
-
 // create login
 
 interface loginType {
@@ -525,7 +743,7 @@ export const updateAccessToken = CatchAsyncError(
       res.cookie("access_token", access_token, accessTokenOptions);
       res.cookie("refresh_token", new_refresh_token, refreshTokenOptions);
 
-      await client.set(user._id, JSON.stringify(user), { "EX": 6048000});
+      await client.set(user._id, JSON.stringify(user), { EX: 6048000 });
 
       res.status(200).json({
         status: "success",
@@ -774,7 +992,7 @@ export const createAdmin = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { name, email, password } = req.body;
-      
+
       // Validate required fields
       if (!email || !password || !name) {
         return next(
@@ -787,13 +1005,13 @@ export const createAdmin = CatchAsyncError(
           })
         );
       }
-      
+
       // Check email format
       const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
       if (!emailRegex.test(email)) {
         return next(new AppError("Please provide a valid email address", 400));
       }
-      
+
       // Check if email exists
       const existingUser = await UserModel.findOne({ email });
       if (existingUser) {
@@ -804,7 +1022,7 @@ export const createAdmin = CatchAsyncError(
           })
         );
       }
-      
+
       // Create admin user with verified status
       const adminUser = await UserModel.create({
         name,
@@ -813,7 +1031,7 @@ export const createAdmin = CatchAsyncError(
         role: "admin",
         isVerified: true, // Auto-verify admin users
       });
-      
+
       res.status(201).json({
         success: true,
         message: "Admin user created successfully",
@@ -827,7 +1045,9 @@ export const createAdmin = CatchAsyncError(
       });
     } catch (error: any) {
       console.error("Admin creation error:", error);
-      return next(new AppError(error.message || "Failed to create admin user", 500));
+      return next(
+        new AppError(error.message || "Failed to create admin user", 500)
+      );
     }
   }
 );
@@ -838,23 +1058,28 @@ export const createInitialAdmin = CatchAsyncError(
     try {
       // Check if any admin exists in the system
       const adminExists = await UserModel.findOne({ role: "admin" });
-      
+
       if (adminExists) {
-        return next(new AppError("Admin user already exists. Please use regular admin creation.", 400));
+        return next(
+          new AppError(
+            "Admin user already exists. Please use regular admin creation.",
+            400
+          )
+        );
       }
-      
+
       const { name, email, password, setupKey } = req.body;
-      
+
       // Validate setup key from environment variable
       if (setupKey !== process.env.ADMIN_SETUP_KEY) {
         return next(new AppError("Invalid setup key", 403));
       }
-      
+
       // Validate required fields
       if (!email || !password || !name) {
         return next(new AppError("All fields are required", 400));
       }
-      
+
       // Create initial admin user
       const adminUser = await UserModel.create({
         name,
@@ -863,7 +1088,7 @@ export const createInitialAdmin = CatchAsyncError(
         role: "admin",
         isVerified: true,
       });
-      
+
       res.status(201).json({
         success: true,
         message: "Initial admin user created successfully",
@@ -876,7 +1101,9 @@ export const createInitialAdmin = CatchAsyncError(
       });
     } catch (error: any) {
       console.error("Initial admin creation error:", error);
-      return next(new AppError(error.message || "Failed to create initial admin", 500));
+      return next(
+        new AppError(error.message || "Failed to create initial admin", 500)
+      );
     }
   }
 );

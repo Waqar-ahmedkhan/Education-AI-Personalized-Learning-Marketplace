@@ -23,12 +23,11 @@ const UserRoute = express.Router();
 UserRoute.post("/registration", registerUser);
 UserRoute.post("/active-user", activateUser);
 UserRoute.post("/login-user", UserLogin);
-UserRoute.get("/logout-user", isAuthenticated, UserLogout);
 UserRoute.get("/refresh", updateAccessToken);
-UserRoute.get("/me", isAuthenticated, getUserInformatin);
 UserRoute.post("/soical-auth", socialAuth);
+UserRoute.get("/logout-user", isAuthenticated, UserLogout);
+UserRoute.get("/me", isAuthenticated, getUserInformatin);
 UserRoute.put("/update-user-info", isAuthenticated, UpdateUserInformation);
-
 UserRoute.put("/update-password", isAuthenticated, UpdatePassword);
 UserRoute.put("/avatar-upload", isAuthenticated, UpdateProfilePicture);
 

@@ -40,6 +40,7 @@ export default function RegistrationPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState(0)
+  const [redirectCountdown, setRedirectCountdown] = useState(3)
   
   const router = useRouter()
   const { theme, systemTheme } = useTheme()
@@ -49,6 +50,22 @@ export default function RegistrationPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Auto redirect countdown after successful registration
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (isSuccess && redirectCountdown > 0) {
+      interval = setInterval(() => {
+        setRedirectCountdown(prev => prev - 1)
+      }, 1000)
+    } else if (isSuccess && redirectCountdown === 0) {
+      router.push('/auth/activation')
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [isSuccess, redirectCountdown, router])
 
   const currentTheme = theme === 'system' ? systemTheme : theme
   const isDark = currentTheme === 'dark'
@@ -165,16 +182,21 @@ export default function RegistrationPage() {
       const data: ApiResponse = await response.json()
 
       if (data.success) {
-        setIsSuccess(true)
-        setSuccessMessage(data.message)
+        // Store necessary data for activation
         if (data.activationToken) {
           sessionStorage.setItem('activationToken', data.activationToken)
         }
         if (data.data) {
           sessionStorage.setItem('registrationData', JSON.stringify(data.data))
         }
+        
+        setIsSuccess(true)
+        setSuccessMessage(data.message)
         setFormData({ name: '', email: '', password: '' })
         setPasswordStrength(0)
+        
+        // Start countdown for auto redirect
+        setRedirectCountdown(3)
       } else {
         if (data.errors) {
           setErrors(data.errors)
@@ -209,7 +231,7 @@ export default function RegistrationPage() {
     return null // Prevent hydration mismatch
   }
 
-  // Success screen
+  // Success screen with auto redirect
   if (isSuccess) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-200 bg-gradient-to-br ${isDark ? 'from-gray-900 via-gray-800 to-indigo-900' : 'from-blue-50 via-indigo-50 to-purple-50'}`}>
@@ -222,21 +244,36 @@ export default function RegistrationPage() {
           <h2 className={`text-2xl sm:text-3xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
             Registration Successful!
           </h2>
-          <p className={`mb-6 text-sm sm:text-base ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+          <p className={`mb-4 text-sm sm:text-base ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
             {successMessage}
           </p>
-          <div className="space-y-4">
+          
+          {/* Auto redirect notice */}
+          <div className={`mb-6 p-4 rounded-lg ${isDark ? 'bg-indigo-900/30 border border-indigo-500/30' : 'bg-indigo-50 border border-indigo-200'}`}>
+            <p className={`text-sm ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
+              Redirecting to activation page in{' '}
+              <span className="font-bold text-lg">{redirectCountdown}</span> seconds...
+            </p>
+            <div className="mt-2 w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+              <div 
+                className="bg-indigo-600 h-2 rounded-full transition-all duration-1000 ease-linear"
+                style={{ width: `${((3 - redirectCountdown) / 3) * 100}%` }}
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-3">
             <button
-              onClick={() => router.push('/activation')}
+              onClick={() => router.push('/auth/activation')}
               className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 transition duration-200 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-              Activate Account
+              Activate Now
             </button>
             <button
-              onClick={() => router.push('/login')}
-              className={`w-full py-3 px-4 rounded-lg font-medium transition duration-200 text-sm sm:text-base ${isDark ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              onClick={() => router.push('/auth/login')}
+              className={`w-full py-2 px-4 rounded-lg font-medium transition duration-200 text-sm ${isDark ? 'text-gray-400 hover:text-gray-300' : 'text-gray-600 hover:text-gray-700'}`}
             >
-              Go to Login
+              Skip to Login
             </button>
           </div>
         </div>
@@ -418,7 +455,7 @@ export default function RegistrationPage() {
           <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
             Already have an account?{' '}
             <button
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/auth/login')}
               className="font-medium text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 transition duration-200"
             >
               Sign in here

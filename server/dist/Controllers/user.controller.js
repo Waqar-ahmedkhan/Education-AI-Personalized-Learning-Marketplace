@@ -302,42 +302,215 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
 //     }
 //   }
 // );
+// export const activateUser = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const { activation_token, activation_code } =
+//         req.body as IActivationRequest;
+//       // Verify the activation token
+//       const decoded = jwt.verify(
+//         activation_token,
+//         process.env.ACTIVATION_SECRET as Secret
+//       ) as { user: IRegistrationBody; activationCode: string };
+//       // Verify activation code
+//       if (decoded.activationCode !== activation_code) {
+//         return next(new AppError("Invalid activation code", 400));
+//       }
+//       const { email, name, password } = decoded.user;
+//       // Check if user already exists
+//       const existingUser = await UserModel.findOne({ email });
+//       if (existingUser) {
+//         return next(new AppError("Email already exists", 400));
+//       }
+//       // Create the user
+//       const user = await UserModel.create({
+//         name,
+//         email,
+//         password,
+//       });
+//       res.status(201).json({
+//         success: true,
+//         message: "User activated successfully",
+//         user,
+//       });
+//     } catch (error: any) {
+//       console.error("Activation error:", error);
+//       if (error.name === "JsonWebTokenError") {
+//         return next(new AppError("Invalid activation token", 400));
+//       }
+//       if (error.name === "TokenExpiredError") {
+//         return next(new AppError("Activation token has expired", 400));
+//       }
+//       return next(new AppError("Failed to activate user", 500));
+//     }
+//   }
+// );
 exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
     try {
         const { activation_token, activation_code } = req.body;
-        // Verify the activation token
-        const decoded = jsonwebtoken_1.default.verify(activation_token, process.env.ACTIVATION_SECRET);
-        // Verify activation code
-        if (decoded.activationCode !== activation_code) {
-            return next(new AppError_1.AppError("Invalid activation code", 400));
+        // Validate input
+        if (!activation_token) {
+            return res.status(400).json({
+                success: false,
+                message: "Activation link is invalid or expired. Please request a new activation code.",
+                errorCode: "MISSING_TOKEN"
+            });
+        }
+        if (!activation_code) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter the 4-digit activation code sent to your email.",
+                errorCode: "MISSING_CODE"
+            });
+        }
+        // Validate activation code format
+        if (!/^\d{4}$/.test(activation_code.trim())) {
+            return res.status(400).json({
+                success: false,
+                message: "Activation code must be exactly 4 digits. Please check your email for the correct code.",
+                errorCode: "INVALID_CODE_FORMAT"
+            });
+        }
+        let decoded;
+        try {
+            // Verify the activation token
+            decoded = jsonwebtoken_1.default.verify(activation_token, process.env.ACTIVATION_SECRET);
+        }
+        catch (jwtError) {
+            console.error("JWT verification error:", jwtError);
+            if (jwtError.name === "TokenExpiredError") {
+                return res.status(400).json({
+                    success: false,
+                    message: "Your activation code has expired. Please request a new activation code to continue.",
+                    errorCode: "TOKEN_EXPIRED",
+                    action: "REQUEST_NEW_CODE"
+                });
+            }
+            if (jwtError.name === "JsonWebTokenError") {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid activation link. Please use the latest activation email or request a new code.",
+                    errorCode: "INVALID_TOKEN",
+                    action: "REQUEST_NEW_CODE"
+                });
+            }
+            return res.status(400).json({
+                success: false,
+                message: "Activation link is corrupted or invalid. Please request a new activation code.",
+                errorCode: "TOKEN_ERROR",
+                action: "REQUEST_NEW_CODE"
+            });
+        }
+        // Verify activation code matches
+        if (decoded.activationCode !== activation_code.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: "The activation code you entered is incorrect. Please check your email and try again.",
+                errorCode: "CODE_MISMATCH",
+                action: "RETRY_CODE"
+            });
         }
         const { email, name, password } = decoded.user;
-        // Check if user already exists
-        const existingUser = yield user_model_1.default.findOne({ email });
-        if (existingUser) {
-            return next(new AppError_1.AppError("Email already exists", 400));
+        // Validate decoded user data
+        if (!email || !name || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Activation data is incomplete. Please register again or contact support.",
+                errorCode: "INCOMPLETE_DATA",
+                action: "REGISTER_AGAIN"
+            });
         }
-        // Create the user
-        const user = yield user_model_1.default.create({
-            name,
-            email,
-            password,
-        });
-        res.status(201).json({
-            success: true,
-            message: "User activated successfully",
-            user,
-        });
+        try {
+            // Check if user already exists
+            const existingUser = yield user_model_1.default.findOne({ email });
+            if (existingUser) {
+                // Check if user is already verified
+                if (existingUser.isVerified) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "This account is already activated. You can log in directly.",
+                        errorCode: "ALREADY_ACTIVATED",
+                        action: "GO_TO_LOGIN"
+                    });
+                }
+                else {
+                    // User exists but not verified, update verification status
+                    existingUser.isVerified = true;
+                    yield existingUser.save();
+                    return res.status(200).json({
+                        success: true,
+                        message: "Account activated successfully! You can now log in.",
+                        user: {
+                            name: existingUser.name,
+                            email: existingUser.email,
+                            role: existingUser.role,
+                            isVerified: existingUser.isVerified
+                        }
+                    });
+                }
+            }
+            // Create new user
+            const user = yield user_model_1.default.create({
+                name,
+                email,
+                password,
+                isVerified: true // Set as verified since they completed activation
+            });
+            res.status(201).json({
+                success: true,
+                message: "Account activated successfully! Welcome aboard. You can now log in.",
+                user: {
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    isVerified: user.isVerified
+                }
+            });
+        }
+        catch (dbError) {
+            console.error("Database error during activation:", dbError);
+            if (dbError.code === 11000) { // MongoDB duplicate key error
+                return res.status(400).json({
+                    success: false,
+                    message: "An account with this email already exists. Try logging in instead.",
+                    errorCode: "DUPLICATE_EMAIL",
+                    action: "GO_TO_LOGIN"
+                });
+            }
+            return res.status(500).json({
+                success: false,
+                message: "We're having trouble activating your account right now. Please try again in a few minutes.",
+                errorCode: "DATABASE_ERROR",
+                action: "RETRY_LATER"
+            });
+        }
     }
     catch (error) {
-        console.error("Activation error:", error);
-        if (error.name === "JsonWebTokenError") {
-            return next(new AppError_1.AppError("Invalid activation token", 400));
+        console.error("Unexpected activation error:", error);
+        // Handle specific known errors
+        if ((_a = error.message) === null || _a === void 0 ? void 0 : _a.includes('validation')) {
+            return res.status(400).json({
+                success: false,
+                message: "The information provided is not valid. Please check and try again.",
+                errorCode: "VALIDATION_ERROR"
+            });
         }
-        if (error.name === "TokenExpiredError") {
-            return next(new AppError_1.AppError("Activation token has expired", 400));
+        if (((_b = error.message) === null || _b === void 0 ? void 0 : _b.includes('network')) || ((_c = error.message) === null || _c === void 0 ? void 0 : _c.includes('timeout'))) {
+            return res.status(500).json({
+                success: false,
+                message: "Network issue detected. Please check your connection and try again.",
+                errorCode: "NETWORK_ERROR",
+                action: "RETRY"
+            });
         }
-        return next(new AppError_1.AppError("Failed to activate user", 500));
+        // Generic error
+        return res.status(500).json({
+            success: false,
+            message: "Something went wrong while activating your account. Please try again or contact support if the problem persists.",
+            errorCode: "INTERNAL_ERROR",
+            action: "RETRY_OR_CONTACT_SUPPORT"
+        });
     }
 }));
 exports.UserLogin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {

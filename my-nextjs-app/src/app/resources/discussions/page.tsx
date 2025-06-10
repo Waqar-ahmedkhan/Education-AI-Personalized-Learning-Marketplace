@@ -9,6 +9,18 @@ interface Discussion {
   upvotes: number;
 }
 
+interface Message {
+  sender: string;
+  content: string;
+  timestamp: string;
+}
+
+interface Member {
+  name: string;
+  role: string;
+  type: "community" | "staff";
+}
+
 const Page = () => {
   const [discussions] = useState<Discussion[]>([
     {
@@ -23,15 +35,18 @@ const Page = () => {
     },
   ]);
 
-  const community = [
-    { name: "John Doe", role: "Developer" },
-    { name: "Jane Smith", role: "Designer" },
-  ];
+  const [messages, setMessages] = useState<Message[]>([
+    { sender: "John Doe", content: "Hello everyone!", timestamp: "05:05 PM, Jun 10, 2025" },
+    { sender: "Jane Smith", content: "Great topic! Any tips?", timestamp: "05:06 PM, Jun 10, 2025" },
+  ]);
 
-  const staff = [
-    { name: "Alice Johnson", role: "Senior Developer" },
-    { name: "Bob Brown", role: "Project Manager" },
-  ];
+  const [newMessage, setNewMessage] = useState("");
+  const [members] = useState<Member[]>([
+    { name: "John Doe", role: "Developer", type: "community" },
+    { name: "Jane Smith", role: "Designer", type: "community" },
+    { name: "Alice Johnson", role: "Senior Developer", type: "staff" },
+    { name: "Bob Brown", role: "Project Manager", type: "staff" },
+  ]);
 
   const decisions = [
     { topic: "Adopt TypeScript for All Projects", decision: "Approved by majority vote on June 10, 2025" },
@@ -55,6 +70,14 @@ const Page = () => {
   if (!mounted) return null;
 
   const isDarkMode = resolvedTheme === "dark";
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newMessage.trim()) {
+      setMessages([...messages, { sender: "You", content: newMessage, timestamp: "05:08 PM, Jun 10, 2025" }]);
+      setNewMessage("");
+    }
+  };
 
   return (
     <div className={`min-h-screen ${isDarkMode ? `bg-gradient-to-b from-[#121e4a] to-black text-white` : `bg-gradient-to-b from-[#121e4a]/20 to-white text-gray-900`} flex flex-col items-center justify-start p-6`}>
@@ -87,19 +110,35 @@ const Page = () => {
         </div>
       </div>
       <div className="w-full max-w-4xl mb-12">
-        <h2 className={`text-3xl font-semibold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Community</h2>
-        <div className="space-y-4">
-          {community.map((member, index) => (
-            <div key={index} className={`p-4 rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
-              {member.name} - {member.role}
+        <h2 className={`text-3xl font-semibold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Chat</h2>
+        <div className={`p-6 rounded-xl shadow-lg ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border mb-4 h-64 overflow-y-auto`}>
+          {messages.map((msg, index) => (
+            <div key={index} className={`mb-2 ${msg.sender === "You" ? "text-right" : "text-left"}`}>
+              <span className={`inline-block p-2 rounded-lg ${isDarkMode ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-800"}`}>{msg.content}</span>
+              <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{msg.sender} - {msg.timestamp}</p>
             </div>
           ))}
         </div>
+        <form onSubmit={handleSendMessage} className="flex gap-2">
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type your message..."
+            className={`flex-1 p-2 rounded-lg ${isDarkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-900 border-gray-300"} border`}
+          />
+          <button
+            type="submit"
+            className={`px-4 py-2 rounded-full ${isDarkMode ? "bg-purple-600 text-white hover:bg-purple-700" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}
+          >
+            Send
+          </button>
+        </form>
       </div>
       <div className="w-full max-w-4xl mb-12">
-        <h2 className={`text-3xl font-semibold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Staff</h2>
+        <h2 className={`text-3xl font-semibold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Community</h2>
         <div className="space-y-4">
-          {staff.map((member, index) => (
+          {members.filter(member => member.type === "community").map((member, index) => (
             <div key={index} className={`p-4 rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
               {member.name} - {member.role}
             </div>
@@ -107,6 +146,16 @@ const Page = () => {
         </div>
       </div>
       <div className="w-full max-w-4xl">
+        <h2 className={`text-3xl font-semibold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Staff</h2>
+        <div className="space-y-4">
+          {members.filter(member => member.type === "staff").map((member, index) => (
+            <div key={index} className={`p-4 rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
+              {member.name} - {member.role}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="w-full max-w-4xl mb-12">
         <h2 className={`text-3xl font-semibold mb-6 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Decisions</h2>
         <div className="space-y-4">
           {decisions.map((decision, index) => (

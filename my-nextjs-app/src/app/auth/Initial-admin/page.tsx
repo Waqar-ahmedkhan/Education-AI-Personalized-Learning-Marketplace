@@ -1,24 +1,23 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { useAuth } from '@/lib/auth'
+import axios from 'axios'
+import Cookies from 'js-cookie'
 
-
-export default function AdminLoginPage() {
+export default function InitialAdminPage() {
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [setupKey, setSetupKey] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
-  const searchParams = useSearchParams()
+  const router = useRouter()
   const { theme, systemTheme } = useTheme()
-  const { login } = useAuth()
-  const emailInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setMounted(true)
-    emailInputRef.current?.focus()
   }, [])
 
   const isDark = theme === 'system' ? systemTheme === 'dark' : theme === 'dark'
@@ -27,9 +26,20 @@ export default function AdminLoginPage() {
     e.preventDefault()
     setError(null)
     try {
-      await login(email, password)
-    } catch {
-      setError(searchParams.get('error') || 'Invalid email or password')
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/setup-initial-admin`, {
+        name,
+        email,
+        password,
+        setupKey,
+      })
+      const data = res.data as { success: boolean; accessToken: string }
+      if (data.success) {
+        Cookies.set('access_token', data.accessToken, { expires: 7, path: '/' })
+        router.push('/dashboard')
+      }
+    } catch (err) {
+      console.error('Error creating initial admin:', err)
+      setError('Failed to create initial admin')
     }
   }
 
@@ -51,17 +61,26 @@ export default function AdminLoginPage() {
             </svg>
           </div>
           <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            Admin Login
+            Initial Admin Setup
           </h1>
           <p className={`mt-2 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-            Sign in to access the admin panel
+            Create the first admin user
           </p>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
+            <label className="block text-sm font-medium">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
+          <div className="mb-4">
             <label className="block text-sm font-medium">Email</label>
             <input
-              ref={emailInputRef}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -79,21 +98,26 @@ export default function AdminLoginPage() {
               required
             />
           </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium">Setup Key</label>
+            <input
+              type="text"
+              value={setupKey}
+              onChange={(e) => setSetupKey(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+            />
+          </div>
           <button
             type="submit"
             className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
           >
-            Login
+            Create Admin
           </button>
         </form>
         {error && (
           <div className={`mt-4 p-3 rounded-lg border ${isDark ? 'bg-red-900/20 border-red-500 text-red-400' : 'bg-red-50 border-red-200 text-red-600'}`}>
-            <p className="text-sm flex items-center">
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              {error}
-            </p>
+            <p className="text-sm">{error}</p>
           </div>
         )}
       </div>

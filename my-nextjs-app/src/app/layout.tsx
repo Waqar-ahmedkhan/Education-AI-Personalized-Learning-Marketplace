@@ -1,20 +1,22 @@
-import { Inter } from "next/font/google";
-import "@/app/globals.css";
-import { ThemeProvider } from "@/components/core/ThemeProvider";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
 
-const inter = Inter({ subsets: ["latin"] });
+import { Inter } from 'next/font/google'
+import '@/app/globals.css'
+import { ThemeProvider } from '@/components/core/ThemeProvider'
+import { AuthProvider } from '@/lib/auth'
+import Navbar from '@/components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: "My Next.js 15 App",
-  description: "A modern Next.js app with shadcn/ui and Tailwind CSS",
-};
+  title: 'My Next.js 15 App',
+  description: 'A modern Next.js app with shadcn/ui and Tailwind CSS',
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -25,11 +27,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar />
-          {children}
-          <Footer />
+          <AuthProvider>
+            <Navbar />
+            {children}
+            <Footer />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }

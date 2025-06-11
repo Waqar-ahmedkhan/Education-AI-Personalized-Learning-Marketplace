@@ -1,3 +1,4 @@
+"use client"
 import Sidebar from '@/components/dashboard/Sidebar'
 import Navbar from '@/components/dashboard/Navbar'
 import { AuthProvider } from '@/lib/auth'

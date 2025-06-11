@@ -9,40 +9,44 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/dashboard')) {
     if (!token) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(new URL('/admin-login', request.url))
     }
     try {
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      const data = res.data as { role?: string };
+      const data = res.data as { role?: string }
       if (data.role !== 'admin') {
         Cookies.remove('access_token')
-        return NextResponse.redirect(new URL('/login?error=Access denied. Admin role required.', request.url))
+        return NextResponse.redirect(new URL('/admin-login?error=Access denied. Admin role required.', request.url))
       }
-    } catch {
+    } catch{
       Cookies.remove('access_token')
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(new URL('/admin-login', request.url))
     }
   }
 
-  if (pathname === '/login' && token) {
+  if (pathname === '/admin-login' && token) {
     try {
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      const data = res.data as { role?: string };
+      const data = res.data as { role?: string }
       if (data.role === 'admin') {
         return NextResponse.redirect(new URL('/dashboard', request.url))
       }
-    } catch {
+    } catch{
       return NextResponse.next()
     }
+  }
+
+  if (pathname === '/Initial-admin' && token) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: ['/dashboard/:path*', '/admin-login', '/initial-admin'],
 }

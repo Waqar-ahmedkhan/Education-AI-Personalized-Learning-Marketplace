@@ -16,6 +16,7 @@ import {
   UpdateUserRoleServices,
 } from "../services/user.services";
 import cloudinary from "cloudinary";
+import * as crypto from "crypto";
 
 interface IRegistrationBody {
   name: string;
@@ -36,6 +37,9 @@ interface IActivationRequest {
   activation_token: string;
   activation_code: string;
 }
+
+
+
 
 export const createActivationToken = (
   user: IRegistrationBody
@@ -264,151 +268,8 @@ export const registerUser = CatchAsyncError(
   }
 );
 
-// export const registerUser = CatchAsyncError(
-//   async (req: Request, res: Response, next: NextFunction) => {
-//     try {
-//       const { name, email, password } = req.body as IRegistrationBody;
 
-//       // Validate required fields
-//       if (!email || !password || !name) {
-//         return next(
-//           new AppError("Validation failed", 400, {
-//             errors: {
-//               email: !email ? "Email is required" : undefined,
-//               password: !password ? "Password is required" : undefined,
-//               name: !name ? "Name is required" : undefined,
-//             },
-//           })
-//         );
-//       }
 
-//       // Check email format
-//       const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
-//       if (!emailRegex.test(email)) {
-//         return next(new AppError("Please provide a valid email address", 400));
-//       }
-
-//       // Check if email exists
-//       const existingUser = await UserModel.findOne({ email });
-//       if (existingUser) {
-//         res.json({
-//           status: "400",
-//           message: "Email already exists",
-//           path: "email",
-//           value: req.body.email,
-//         });
-//         return next(
-//           new AppError("Email already exists", 400, {
-//             path: "email",
-//             value: req.body.email,
-//           })
-//         );
-//       }
-
-//       // Create user input object
-//       const userInput: IRegistrationBody = {
-//         name,
-//         email,
-//         password,
-//       };
-
-//       // Generate activation token
-//       let activationToken;
-//       try {
-//         activationToken = createActivationToken(userInput);
-//       } catch (tokenError: any) {
-//         console.error("Token creation error:", tokenError);
-//         return next(
-//           new AppError(
-//             tokenError.message || "Failed to create activation token",
-//             500
-//           )
-//         );
-//       }
-
-//       // Prepare email data
-//       const emailData = {
-//         user: { name: userInput.name },
-//         activationCode: activationToken.activationCode,
-//       };
-
-//       try {
-//         await sendEmail({
-//           email: userInput.email,
-//           subject: "Account Activation - EduAI",
-//           template: "activation-code.ejs",
-//           data: emailData,
-//         });
-//       } catch (emailError: any) {
-//         console.error("Email sending error:", emailError);
-//         return next(new AppError("Failed to send activation email", 500));
-//       }
-
-//       // Success response
-//       return res.status(201).json({
-//         success: true,
-//         message:
-//           "Registration successful! Please check your email for activation code.",
-//         activationToken: activationToken.token,
-//       });
-//     } catch (error: any) {
-//       console.error("Registration error:", error);
-//       if (!res.headersSent) {
-//         return next(new AppError(error.message || "Registration failed", 500));
-//       }
-//     }
-//   }
-// );
-
-// export const activateUser = CatchAsyncError(
-//   async (req: Request, res: Response, next: NextFunction) => {
-//     try {
-//       const { activation_token, activation_code } =
-//         req.body as IActivationRequest;
-
-//       // Verify the activation token
-//       const decoded = jwt.verify(
-//         activation_token,
-//         process.env.ACTIVATION_SECRET as Secret
-//       ) as { user: IRegistrationBody; activationCode: string };
-
-//       // Verify activation code
-//       if (decoded.activationCode !== activation_code) {
-//         return next(new AppError("Invalid activation code", 400));
-//       }
-
-//       const { email, name, password } = decoded.user;
-
-//       // Check if user already exists
-//       const existingUser = await UserModel.findOne({ email });
-//       if (existingUser) {
-//         return next(new AppError("Email already exists", 400));
-//       }
-
-//       // Create the user
-//       const user = await UserModel.create({
-//         name,
-//         email,
-//         password,
-//       });
-
-//       res.status(201).json({
-//         success: true,
-//         message: "User activated successfully",
-//         user,
-//       });
-//     } catch (error: any) {
-//       console.error("Activation error:", error);
-//       if (error.name === "JsonWebTokenError") {
-//         return next(new AppError("Invalid activation token", 400));
-//       }
-//       if (error.name === "TokenExpiredError") {
-//         return next(new AppError("Activation token has expired", 400));
-//       }
-//       return next(new AppError("Failed to activate user", 500));
-//     }
-//   }
-// );
 
 export const activateUser = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -624,33 +485,40 @@ interface loginType {
   email: string;
   password: string;
 }
+
 export const UserLogin = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email, password } = req.body as loginType;
 
+      // Validate input
       if (!email || !password) {
-        return next(new AppError("Please enter both email and password", 400));
+        return next(new AppError('Please enter both email and password', 400));
       }
 
-      const user = await UserModel.findOne({ email }).select("+password");
+      // Find user and select password
+      const user = await UserModel.findOne({ email }).select('+password');
       if (!user) {
-        return next(new AppError("Incorrect email or password", 400));
+        return next(new AppError('Email not found', 401));
       }
 
+      // Check role
+      if (user.role !== 'user') {
+        return next(new AppError('This login is for users only. Please use the admin login.', 403));
+      }
+
+      // Compare password
       const isPasswordMatch = await user.comparePassword(password);
       if (!isPasswordMatch) {
-        return next(new AppError("Incorrect email or password", 400));
+        return next(new AppError('Incorrect password', 401));
       }
 
-      // Generate and send tokens
+      // Send token only if all checks pass
       sendToken(user, 200, res);
-    } catch (err) {
-      console.log("Error in login:", err);
-      res.status(400).json({
-        success: false,
-        message: "Error during login",
-      });
+    } catch (err: any) {
+      console.error('Error in user login:', err);
+      // Ensure no response is sent before this point
+      return next(new AppError(err.message || 'Error during user login', 500));
     }
   }
 );
@@ -685,6 +553,8 @@ export const UserLogout = CatchAsyncError(
     }
   }
 );
+
+
 
 export const updateAccessToken = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -988,6 +858,37 @@ export const deleteUser = CatchAsyncError(
   }
 );
 
+export const adminLogin = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email, password } = req.body as loginType;
+
+      if (!email || !password) {
+        return next(new AppError('Please enter both email and password', 400));
+      }
+
+      const user = await UserModel.findOne({ email }).select('+password');
+      if (!user) {
+        return next(new AppError('Incorrect email or password', 401));
+      }
+
+      if (user.role !== 'admin') {
+        return next(new AppError('This login is for admins only. Please use the user login.', 403));
+      }
+
+      const isPasswordMatch = await user.comparePassword(password);
+      if (!isPasswordMatch) {
+        return next(new AppError('Incorrect email or password', 401));
+      }
+
+      sendToken(user, 200, res);
+    } catch (err: any) {
+      console.error('Error in admin login:', err);
+      return next(new AppError('Error during admin login', 500));
+    }
+  }
+);
+
 export const createAdmin = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1107,3 +1008,180 @@ export const createInitialAdmin = CatchAsyncError(
     }
   }
 );
+
+
+export const forgetPassword = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body;
+
+      // Validate email input
+      if (!email || typeof email !== "string" || !email.trim()) {
+        return next(new AppError("Please provide a valid email", 400));
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        return next(new AppError("Please provide a valid email address", 400));
+      }
+
+      // Find user by email
+      const user = await UserModel.findOne({ email: normalizedEmail }).select(
+        "+password"
+      );
+
+      // Always return a generic response to prevent email enumeration
+      if (!user) {
+        return res.status(200).json({
+          success: true,
+          message:
+            "If an account exists with this email, a password reset email has been sent.",
+        });
+      }
+
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+
+      // Set token and expiry on user
+      user.resetPasswordToken = hashedToken;
+      user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      await user.save();
+
+      // Construct reset URL
+      const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/reset-password?token=${resetToken}`;
+
+      // Prepare email template
+      const emailData = {
+        name: user.name,
+        resetUrl,
+        appName: "EduAI",
+        supportEmail: process.env.SUPPORT_EMAIL || "support@eduai.com",
+      };
+
+      // Send reset email
+      try {
+        await sendEmail({
+          email: user.email,
+          subject: "Password Reset Request - EduAI",
+          template: "password-reset.ejs",
+          data: emailData,
+        });
+      } catch (emailError: any) {
+        // Clear token if email fails
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
+
+        console.error("Email sending error:", emailError);
+        return next(
+          new AppError(
+            "Failed to send password reset email. Please try again later.",
+            500
+          )
+        );
+      }
+
+      res.status(200).json({
+        success: true,
+        message:
+          "If an account exists with this email, a password reset email has been sent.",
+      });
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      return next(
+        new AppError(
+          "An error occurred while processing your request. Please try again.",
+          500
+        )
+      );
+    }
+  }
+);
+
+export const resetPassword = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      // Validate input
+      if (!token || !newPassword) {
+        return next(
+          new AppError("Reset token and new password are required", 400)
+        );
+      }
+
+      // Validate password
+      if (typeof newPassword !== "string") {
+        return next(new AppError("Password must be a string", 400));
+      }
+
+      if (newPassword.length < 6) {
+        return next(
+          new AppError("Password must be at least 6 characters long", 400)
+        );
+      }
+
+      if (newPassword.length > 128) {
+        return next(
+          new AppError("Password must not exceed 128 characters", 400)
+        );
+      }
+
+      // Optional: Add complexity check to match registration
+      if (
+        !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(
+          newPassword
+        )
+      ) {
+        return next(
+          new AppError(
+            "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+            400
+          )
+        );
+      }
+
+      // Hash the provided token
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+
+      // Find user with valid token and non-expired reset period
+      const user = await UserModel.findOne({
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: { $gt: Date.now() },
+      }).select("+password");
+
+      if (!user) {
+        return next(new AppError("Invalid or expired reset token", 400));
+      }
+
+      // Update password and clear reset fields
+      user.password = newPassword;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Password updated successfully. You can now log in.",
+      });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      return next(
+        new AppError(
+          "An error occurred while resetting your password. Please try again.",
+          500
+        )
+      );
+    }
+  }
+);
+
+

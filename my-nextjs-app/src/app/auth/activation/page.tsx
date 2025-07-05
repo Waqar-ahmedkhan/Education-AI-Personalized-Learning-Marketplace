@@ -44,8 +44,8 @@ const ERROR_MESSAGES: Record<string, { message: string; action?: string }> = {
   TOKEN_ERROR: { message: 'Activation link is corrupted. Please request a new code.', action: '/resend-activation' },
   CODE_MISMATCH: { message: 'The activation code is incorrect. Please check and try again.' },
   INCOMPLETE_DATA: { message: 'Activation data is incomplete. Please register again.', action: '/register' },
-  ALREADY_ACTIVATED: { message: 'This account is already activated. You can log in.', action: '/login' },
-  DUPLICATE_EMAIL: { message: 'An account with this email exists. Try logging in.', action: '/login' },
+  ALREADY_ACTIVATED: { message: 'This account is already activated. You can log in.', action: '/auth/login' },
+  DUPLICATE_EMAIL: { message: 'An account with this email exists. Try logging in.', action: '/auth/login' },
   DATABASE_ERROR: { message: 'Server error. Please try again later.' },
   VALIDATION_ERROR: { message: 'Invalid information provided. Please check and try again.' },
   NETWORK_ERROR: { message: 'Network issue detected. Please check your connection.' },
@@ -352,7 +352,7 @@ export default function ActivationPage() {
           }))
         }
         
-        setTimeout(() => router.push('/login'), 2500)
+        setTimeout(() => router.push('/auth/login'), 2500)
       } else {
         const errorInfo = ERROR_MESSAGES[data.errorCode || 'INTERNAL_ERROR']
         setErrors({ general: errorInfo.message })

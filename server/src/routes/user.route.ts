@@ -1,64 +1,62 @@
 import express from "express";
 import {
   activateUser,
-  createAdmin,
-  createInitialAdmin,
-  deleteUser,
-  getallUsers,
-  getUserInformatin,
   registerUser,
   socialAuth,
   updateAccessToken,
-  UpdatePassword,
-  UpdateProfilePicture,
-  UpdateUserInformation,
-  updateUserRoles,
   UserLogin,
   UserLogout,
+  getUserInformatin,
+  UpdateUserInformation,
+  UpdatePassword,
+  UpdateProfilePicture,
+  forgetPassword,
+  resetPassword,
 } from "../Controllers/user.controller";
-import { authorizedRoles, isAuthenticated } from "../middlewares/auth";
+import { isAuthenticated, isUser } from "../middlewares/auth";
+import rateLimit from "express-rate-limit";
 
 const UserRoute = express.Router();
 
-UserRoute.post("/registration", registerUser);
-UserRoute.post("/active-user", activateUser);
-UserRoute.post("/login-user", UserLogin);
-UserRoute.get("/refresh", updateAccessToken);
-UserRoute.post("/soical-auth", socialAuth);
-UserRoute.get("/logout-user", isAuthenticated, UserLogout);
-UserRoute.get("/me", isAuthenticated, getUserInformatin);
-UserRoute.put("/update-user-info", isAuthenticated, UpdateUserInformation);
-UserRoute.put("/update-password", isAuthenticated, UpdatePassword);
-UserRoute.put("/avatar-upload", isAuthenticated, UpdateProfilePicture);
+// Rate limiter for forget password
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: {
+    success: false,
+    message: "Too many requests, please try again later.",
+  },
+});
 
-UserRoute.get(
-  "/get-users",
-  isAuthenticated,
-  authorizedRoles("admin"),
-  getallUsers
-); 
+// Public user routes
+UserRoute.post("/user/registration", registerUser);
+UserRoute.post("/user/activate", activateUser);
+UserRoute.post("/user/login", UserLogin);
+UserRoute.post("/user/social-auth", socialAuth);
+UserRoute.post("/user/forgot-password", forgotPasswordLimiter, forgetPassword);
+UserRoute.post("/user/reset-password", resetPassword);
+
+// Protected user routes
+UserRoute.get("/user/refresh", isAuthenticated, isUser, updateAccessToken);
+UserRoute.get("/user/logout", isAuthenticated, isUser, UserLogout);
+UserRoute.get("/user/me", isAuthenticated, isUser, getUserInformatin);
 UserRoute.put(
-  "/update-user-route",
+  "/user/update-info",
   isAuthenticated,
-  authorizedRoles("admin"),
-  updateUserRoles
+  isUser,
+  UpdateUserInformation
 );
-
-UserRoute.delete(
-  "/user-delete/:id",
+UserRoute.put(
+  "/user/update-password",
   isAuthenticated,
-  authorizedRoles("admin"),
-  deleteUser
+  isUser,
+  UpdatePassword
 );
-
-UserRoute.post(
-  "/create-admin",
+UserRoute.put(
+  "/user/avatar-upload",
   isAuthenticated,
-  authorizedRoles("admin"),
-  createAdmin
+  isUser,
+  UpdateProfilePicture
 );
-
-// Route for creating the initial admin user (requires setup key)
-UserRoute.post("/setup-initial-admin", createInitialAdmin);
 
 export default UserRoute;

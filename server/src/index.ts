@@ -10,6 +10,7 @@ import UserRoute from "./routes/user.route";
 import courseRouter from "./routes/course.route";
 import orderRoute from "./routes/order.route";
 import notificationRoute from "./routes/notification.route";
+import AdminRoute from "./routes/admin.route";
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use(cookieParser());
 connectRedis();
 
 app.use("/api/v1", UserRoute);
+app.use("/api/v1", AdminRoute);
 app.use("/api/v1", courseRouter);
 app.use("/api/v1", orderRoute);
 app.use("/api/v1", notificationRoute);

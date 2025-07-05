@@ -16,6 +16,7 @@ const user_route_1 = __importDefault(require("./routes/user.route"));
 const course_route_1 = __importDefault(require("./routes/course.route"));
 const order_route_1 = __importDefault(require("./routes/order.route"));
 const notification_route_1 = __importDefault(require("./routes/notification.route"));
+const admin_route_1 = __importDefault(require("./routes/admin.route"));
 dotenv_1.default.config();
 exports.app = (0, express_1.default)();
 // Middlewares
@@ -27,6 +28,7 @@ exports.app.use((0, cookie_parser_1.default)());
 //connectDbs
 (0, RedisConnect_1.connectRedis)();
 exports.app.use("/api/v1", user_route_1.default);
+exports.app.use("/api/v1", admin_route_1.default);
 exports.app.use("/api/v1", course_route_1.default);
 exports.app.use("/api/v1", order_route_1.default);
 exports.app.use("/api/v1", notification_route_1.default);

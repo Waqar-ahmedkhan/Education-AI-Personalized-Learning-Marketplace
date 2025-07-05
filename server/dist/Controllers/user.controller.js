@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -12,7 +35,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createInitialAdmin = exports.createAdmin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.resetPassword = exports.forgetPassword = exports.createInitialAdmin = exports.createAdmin = exports.adminLogin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -22,6 +45,7 @@ const jwt_1 = require("../utils/jwt");
 const RedisConnect_1 = require("../utils/RedisConnect");
 const user_services_1 = require("../services/user.services");
 const cloudinary_1 = __importDefault(require("cloudinary"));
+const crypto = __importStar(require("crypto"));
 const createActivationToken = (user) => {
     if (!process.env.ACTIVATION_SECRET) {
         throw new Error("ACTIVATION_SECRET is not defined in environment variables");
@@ -44,7 +68,7 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
         // Comprehensive validation with detailed error messages
         const validationErrors = {};
         // Name validation
-        if (!name || typeof name !== 'string') {
+        if (!name || typeof name !== "string") {
             validationErrors.name = "Name is required";
         }
         else if (name.trim().length < 2) {
@@ -57,7 +81,7 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             validationErrors.name = "Name can only contain letters and spaces";
         }
         // Email validation
-        if (!email || typeof email !== 'string') {
+        if (!email || typeof email !== "string") {
             validationErrors.email = "Email is required";
         }
         else {
@@ -70,24 +94,26 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             }
         }
         // Password validation
-        if (!password || typeof password !== 'string') {
+        if (!password || typeof password !== "string") {
             validationErrors.password = "Password is required";
         }
         else if (password.length < 8) {
-            validationErrors.password = "Password must be at least 8 characters long";
+            validationErrors.password =
+                "Password must be at least 8 characters long";
         }
         else if (password.length > 128) {
             validationErrors.password = "Password must not exceed 128 characters";
         }
         else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password)) {
-            validationErrors.password = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character";
+            validationErrors.password =
+                "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character";
         }
         // Return validation errors if any
         if (Object.keys(validationErrors).length > 0) {
             return res.status(400).json({
                 success: false,
                 message: "Validation failed",
-                errors: validationErrors
+                errors: validationErrors,
             });
         }
         // Normalize email
@@ -97,14 +123,14 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
         let existingUser;
         try {
             existingUser = yield user_model_1.default.findOne({
-                email: normalizedEmail
-            }).select('email');
+                email: normalizedEmail,
+            }).select("email");
         }
         catch (dbError) {
             console.error("Database query error:", dbError);
             return res.status(500).json({
                 success: false,
-                message: "Database connection error. Please try again later."
+                message: "Database connection error. Please try again later.",
             });
         }
         if (existingUser) {
@@ -112,8 +138,8 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                 success: false,
                 message: "An account with this email already exists",
                 errors: {
-                    email: "This email is already registered. Please use a different email or try logging in."
-                }
+                    email: "This email is already registered. Please use a different email or try logging in.",
+                },
             });
         }
         // Create user input object
@@ -127,7 +153,9 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
         try {
             activationToken = (0, exports.createActivationToken)(userInput);
             // Validate token creation
-            if (!activationToken || !activationToken.token || !activationToken.activationCode) {
+            if (!activationToken ||
+                !activationToken.token ||
+                !activationToken.activationCode) {
                 throw new Error("Invalid token structure generated");
             }
         }
@@ -135,18 +163,18 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             console.error("Token creation error:", tokenError);
             return res.status(500).json({
                 success: false,
-                message: "Failed to generate activation code. Please try again."
+                message: "Failed to generate activation code. Please try again.",
             });
         }
         // Prepare email data with proper structure
         const emailData = {
             user: {
                 name: userInput.name,
-                email: userInput.email
+                email: userInput.email,
             },
             activationCode: activationToken.activationCode,
             appName: "EduAI",
-            supportEmail: process.env.SUPPORT_EMAIL || "support@eduai.com"
+            supportEmail: process.env.SUPPORT_EMAIL || "support@eduai.com",
         };
         // Send activation email with comprehensive error handling
         try {
@@ -161,7 +189,7 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             console.error("Email sending error:", emailError);
             // Different error messages based on email error type
             let emailErrorMessage = "Failed to send activation email";
-            if (emailError.code === 'ENOTFOUND') {
+            if (emailError.code === "ENOTFOUND") {
                 emailErrorMessage = "Email service temporarily unavailable";
             }
             else if (emailError.responseCode === 550) {
@@ -172,7 +200,7 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             }
             return res.status(500).json({
                 success: false,
-                message: `${emailErrorMessage}. Please try again or contact support.`
+                message: `${emailErrorMessage}. Please try again or contact support.`,
             });
         }
         // Log successful registration (without sensitive data)
@@ -184,8 +212,8 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             activationToken: activationToken.token,
             data: {
                 email: userInput.email,
-                name: userInput.name
-            }
+                name: userInput.name,
+            },
         });
     }
     catch (error) {
@@ -195,156 +223,26 @@ exports.registerUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             return;
         }
         // Handle different types of errors
-        if (error.name === 'ValidationError') {
+        if (error.name === "ValidationError") {
             return res.status(400).json({
                 success: false,
                 message: "Validation error occurred",
-                errors: error.errors
+                errors: error.errors,
             });
         }
-        if (error.name === 'MongoError' || error.name === 'MongooseError') {
+        if (error.name === "MongoError" || error.name === "MongooseError") {
             return res.status(500).json({
                 success: false,
-                message: "Database error. Please try again later."
+                message: "Database error. Please try again later.",
             });
         }
         // Generic error response
         return res.status(500).json({
             success: false,
-            message: "An unexpected error occurred. Please try again later."
+            message: "An unexpected error occurred. Please try again later.",
         });
     }
 }));
-// export const registerUser = CatchAsyncError(
-//   async (req: Request, res: Response, next: NextFunction) => {
-//     try {
-//       const { name, email, password } = req.body as IRegistrationBody;
-//       // Validate required fields
-//       if (!email || !password || !name) {
-//         return next(
-//           new AppError("Validation failed", 400, {
-//             errors: {
-//               email: !email ? "Email is required" : undefined,
-//               password: !password ? "Password is required" : undefined,
-//               name: !name ? "Name is required" : undefined,
-//             },
-//           })
-//         );
-//       }
-//       // Check email format
-//       const emailRegex = /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/;
-//       if (!emailRegex.test(email)) {
-//         return next(new AppError("Please provide a valid email address", 400));
-//       }
-//       // Check if email exists
-//       const existingUser = await UserModel.findOne({ email });
-//       if (existingUser) {
-//         res.json({
-//           status: "400",
-//           message: "Email already exists",
-//           path: "email",
-//           value: req.body.email,
-//         });
-//         return next(
-//           new AppError("Email already exists", 400, {
-//             path: "email",
-//             value: req.body.email,
-//           })
-//         );
-//       }
-//       // Create user input object
-//       const userInput: IRegistrationBody = {
-//         name,
-//         email,
-//         password,
-//       };
-//       // Generate activation token
-//       let activationToken;
-//       try {
-//         activationToken = createActivationToken(userInput);
-//       } catch (tokenError: any) {
-//         console.error("Token creation error:", tokenError);
-//         return next(
-//           new AppError(
-//             tokenError.message || "Failed to create activation token",
-//             500
-//           )
-//         );
-//       }
-//       // Prepare email data
-//       const emailData = {
-//         user: { name: userInput.name },
-//         activationCode: activationToken.activationCode,
-//       };
-//       try {
-//         await sendEmail({
-//           email: userInput.email,
-//           subject: "Account Activation - EduAI",
-//           template: "activation-code.ejs",
-//           data: emailData,
-//         });
-//       } catch (emailError: any) {
-//         console.error("Email sending error:", emailError);
-//         return next(new AppError("Failed to send activation email", 500));
-//       }
-//       // Success response
-//       return res.status(201).json({
-//         success: true,
-//         message:
-//           "Registration successful! Please check your email for activation code.",
-//         activationToken: activationToken.token,
-//       });
-//     } catch (error: any) {
-//       console.error("Registration error:", error);
-//       if (!res.headersSent) {
-//         return next(new AppError(error.message || "Registration failed", 500));
-//       }
-//     }
-//   }
-// );
-// export const activateUser = CatchAsyncError(
-//   async (req: Request, res: Response, next: NextFunction) => {
-//     try {
-//       const { activation_token, activation_code } =
-//         req.body as IActivationRequest;
-//       // Verify the activation token
-//       const decoded = jwt.verify(
-//         activation_token,
-//         process.env.ACTIVATION_SECRET as Secret
-//       ) as { user: IRegistrationBody; activationCode: string };
-//       // Verify activation code
-//       if (decoded.activationCode !== activation_code) {
-//         return next(new AppError("Invalid activation code", 400));
-//       }
-//       const { email, name, password } = decoded.user;
-//       // Check if user already exists
-//       const existingUser = await UserModel.findOne({ email });
-//       if (existingUser) {
-//         return next(new AppError("Email already exists", 400));
-//       }
-//       // Create the user
-//       const user = await UserModel.create({
-//         name,
-//         email,
-//         password,
-//       });
-//       res.status(201).json({
-//         success: true,
-//         message: "User activated successfully",
-//         user,
-//       });
-//     } catch (error: any) {
-//       console.error("Activation error:", error);
-//       if (error.name === "JsonWebTokenError") {
-//         return next(new AppError("Invalid activation token", 400));
-//       }
-//       if (error.name === "TokenExpiredError") {
-//         return next(new AppError("Activation token has expired", 400));
-//       }
-//       return next(new AppError("Failed to activate user", 500));
-//     }
-//   }
-// );
 exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     try {
@@ -354,14 +252,14 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             return res.status(400).json({
                 success: false,
                 message: "Activation link is invalid or expired. Please request a new activation code.",
-                errorCode: "MISSING_TOKEN"
+                errorCode: "MISSING_TOKEN",
             });
         }
         if (!activation_code) {
             return res.status(400).json({
                 success: false,
                 message: "Please enter the 4-digit activation code sent to your email.",
-                errorCode: "MISSING_CODE"
+                errorCode: "MISSING_CODE",
             });
         }
         // Validate activation code format
@@ -369,7 +267,7 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             return res.status(400).json({
                 success: false,
                 message: "Activation code must be exactly 4 digits. Please check your email for the correct code.",
-                errorCode: "INVALID_CODE_FORMAT"
+                errorCode: "INVALID_CODE_FORMAT",
             });
         }
         let decoded;
@@ -384,7 +282,7 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                     success: false,
                     message: "Your activation code has expired. Please request a new activation code to continue.",
                     errorCode: "TOKEN_EXPIRED",
-                    action: "REQUEST_NEW_CODE"
+                    action: "REQUEST_NEW_CODE",
                 });
             }
             if (jwtError.name === "JsonWebTokenError") {
@@ -392,14 +290,14 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                     success: false,
                     message: "Invalid activation link. Please use the latest activation email or request a new code.",
                     errorCode: "INVALID_TOKEN",
-                    action: "REQUEST_NEW_CODE"
+                    action: "REQUEST_NEW_CODE",
                 });
             }
             return res.status(400).json({
                 success: false,
                 message: "Activation link is corrupted or invalid. Please request a new activation code.",
                 errorCode: "TOKEN_ERROR",
-                action: "REQUEST_NEW_CODE"
+                action: "REQUEST_NEW_CODE",
             });
         }
         // Verify activation code matches
@@ -408,7 +306,7 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                 success: false,
                 message: "The activation code you entered is incorrect. Please check your email and try again.",
                 errorCode: "CODE_MISMATCH",
-                action: "RETRY_CODE"
+                action: "RETRY_CODE",
             });
         }
         const { email, name, password } = decoded.user;
@@ -418,7 +316,7 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                 success: false,
                 message: "Activation data is incomplete. Please register again or contact support.",
                 errorCode: "INCOMPLETE_DATA",
-                action: "REGISTER_AGAIN"
+                action: "REGISTER_AGAIN",
             });
         }
         try {
@@ -431,7 +329,7 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                         success: false,
                         message: "This account is already activated. You can log in directly.",
                         errorCode: "ALREADY_ACTIVATED",
-                        action: "GO_TO_LOGIN"
+                        action: "GO_TO_LOGIN",
                     });
                 }
                 else {
@@ -445,8 +343,8 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                             name: existingUser.name,
                             email: existingUser.email,
                             role: existingUser.role,
-                            isVerified: existingUser.isVerified
-                        }
+                            isVerified: existingUser.isVerified,
+                        },
                     });
                 }
             }
@@ -455,7 +353,7 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                 name,
                 email,
                 password,
-                isVerified: true // Set as verified since they completed activation
+                isVerified: true, // Set as verified since they completed activation
             });
             res.status(201).json({
                 success: true,
@@ -464,44 +362,46 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
                     name: user.name,
                     email: user.email,
                     role: user.role,
-                    isVerified: user.isVerified
-                }
+                    isVerified: user.isVerified,
+                },
             });
         }
         catch (dbError) {
             console.error("Database error during activation:", dbError);
-            if (dbError.code === 11000) { // MongoDB duplicate key error
+            if (dbError.code === 11000) {
+                // MongoDB duplicate key error
                 return res.status(400).json({
                     success: false,
                     message: "An account with this email already exists. Try logging in instead.",
                     errorCode: "DUPLICATE_EMAIL",
-                    action: "GO_TO_LOGIN"
+                    action: "GO_TO_LOGIN",
                 });
             }
             return res.status(500).json({
                 success: false,
                 message: "We're having trouble activating your account right now. Please try again in a few minutes.",
                 errorCode: "DATABASE_ERROR",
-                action: "RETRY_LATER"
+                action: "RETRY_LATER",
             });
         }
     }
     catch (error) {
         console.error("Unexpected activation error:", error);
         // Handle specific known errors
-        if ((_a = error.message) === null || _a === void 0 ? void 0 : _a.includes('validation')) {
+        if ((_a = error.message) === null || _a === void 0 ? void 0 : _a.includes("validation")) {
             return res.status(400).json({
                 success: false,
                 message: "The information provided is not valid. Please check and try again.",
-                errorCode: "VALIDATION_ERROR"
+                errorCode: "VALIDATION_ERROR",
             });
         }
-        if (((_b = error.message) === null || _b === void 0 ? void 0 : _b.includes('network')) || ((_c = error.message) === null || _c === void 0 ? void 0 : _c.includes('timeout'))) {
+        if (((_b = error.message) === null || _b === void 0 ? void 0 : _b.includes("network")) ||
+            ((_c = error.message) === null || _c === void 0 ? void 0 : _c.includes("timeout"))) {
             return res.status(500).json({
                 success: false,
                 message: "Network issue detected. Please check your connection and try again.",
                 errorCode: "NETWORK_ERROR",
-                action: "RETRY"
+                action: "RETRY",
             });
         }
         // Generic error
@@ -509,33 +409,38 @@ exports.activateUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
             success: false,
             message: "Something went wrong while activating your account. Please try again or contact support if the problem persists.",
             errorCode: "INTERNAL_ERROR",
-            action: "RETRY_OR_CONTACT_SUPPORT"
+            action: "RETRY_OR_CONTACT_SUPPORT",
         });
     }
 }));
 exports.UserLogin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
+        // Validate input
         if (!email || !password) {
-            return next(new AppError_1.AppError("Please enter both email and password", 400));
+            return next(new AppError_1.AppError('Please enter both email and password', 400));
         }
-        const user = yield user_model_1.default.findOne({ email }).select("+password");
+        // Find user and select password
+        const user = yield user_model_1.default.findOne({ email }).select('+password');
         if (!user) {
-            return next(new AppError_1.AppError("Incorrect email or password", 400));
+            return next(new AppError_1.AppError('Email not found', 401));
         }
+        // Check role
+        if (user.role !== 'user') {
+            return next(new AppError_1.AppError('This login is for users only. Please use the admin login.', 403));
+        }
+        // Compare password
         const isPasswordMatch = yield user.comparePassword(password);
         if (!isPasswordMatch) {
-            return next(new AppError_1.AppError("Incorrect email or password", 400));
+            return next(new AppError_1.AppError('Incorrect password', 401));
         }
-        // Generate and send tokens
+        // Send token only if all checks pass
         (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (err) {
-        console.log("Error in login:", err);
-        res.status(400).json({
-            success: false,
-            message: "Error during login",
-        });
+        console.error('Error in user login:', err);
+        // Ensure no response is sent before this point
+        return next(new AppError_1.AppError(err.message || 'Error during user login', 500));
     }
 }));
 // User Logout Controller
@@ -603,7 +508,7 @@ exports.updateAccessToken = (0, CatchAsyncError_1.CatchAsyncError)((req, res, ne
         // Set new cookies
         res.cookie("access_token", access_token, jwt_1.accessTokenOptions);
         res.cookie("refresh_token", new_refresh_token, jwt_1.refreshTokenOptions);
-        yield RedisConnect_1.client.set(user._id, JSON.stringify(user), { "EX": 6048000 });
+        yield RedisConnect_1.client.set(user._id, JSON.stringify(user), { EX: 6048000 });
         res.status(200).json({
             status: "success",
             access_token,
@@ -786,6 +691,30 @@ exports.deleteUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
         next(new AppError_1.AppError("Error in deleteUser", 500));
     }
 }));
+exports.adminLogin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return next(new AppError_1.AppError('Please enter both email and password', 400));
+        }
+        const user = yield user_model_1.default.findOne({ email }).select('+password');
+        if (!user) {
+            return next(new AppError_1.AppError('Incorrect email or password', 401));
+        }
+        if (user.role !== 'admin') {
+            return next(new AppError_1.AppError('This login is for admins only. Please use the user login.', 403));
+        }
+        const isPasswordMatch = yield user.comparePassword(password);
+        if (!isPasswordMatch) {
+            return next(new AppError_1.AppError('Incorrect email or password', 401));
+        }
+        (0, jwt_1.sendToken)(user, 200, res);
+    }
+    catch (err) {
+        console.error('Error in admin login:', err);
+        return next(new AppError_1.AppError('Error during admin login', 500));
+    }
+}));
 exports.createAdmin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name, email, password } = req.body;
@@ -876,5 +805,121 @@ exports.createInitialAdmin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, n
     catch (error) {
         console.error("Initial admin creation error:", error);
         return next(new AppError_1.AppError(error.message || "Failed to create initial admin", 500));
+    }
+}));
+exports.forgetPassword = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.body;
+        // Validate email input
+        if (!email || typeof email !== "string" || !email.trim()) {
+            return next(new AppError_1.AppError("Please provide a valid email", 400));
+        }
+        const normalizedEmail = email.trim().toLowerCase();
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(normalizedEmail)) {
+            return next(new AppError_1.AppError("Please provide a valid email address", 400));
+        }
+        // Find user by email
+        const user = yield user_model_1.default.findOne({ email: normalizedEmail }).select("+password");
+        // Always return a generic response to prevent email enumeration
+        if (!user) {
+            return res.status(200).json({
+                success: true,
+                message: "If an account exists with this email, a password reset email has been sent.",
+            });
+        }
+        // Generate reset token
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        const hashedToken = crypto
+            .createHash("sha256")
+            .update(resetToken)
+            .digest("hex");
+        // Set token and expiry on user
+        user.resetPasswordToken = hashedToken;
+        user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        yield user.save();
+        // Construct reset URL
+        const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/reset-password?token=${resetToken}`;
+        // Prepare email template
+        const emailData = {
+            name: user.name,
+            resetUrl,
+            appName: "EduAI",
+            supportEmail: process.env.SUPPORT_EMAIL || "support@eduai.com",
+        };
+        // Send reset email
+        try {
+            yield (0, Sendemail_1.default)({
+                email: user.email,
+                subject: "Password Reset Request - EduAI",
+                template: "password-reset.ejs",
+                data: emailData,
+            });
+        }
+        catch (emailError) {
+            // Clear token if email fails
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpires = undefined;
+            yield user.save();
+            console.error("Email sending error:", emailError);
+            return next(new AppError_1.AppError("Failed to send password reset email. Please try again later.", 500));
+        }
+        res.status(200).json({
+            success: true,
+            message: "If an account exists with this email, a password reset email has been sent.",
+        });
+    }
+    catch (error) {
+        console.error("Forgot password error:", error);
+        return next(new AppError_1.AppError("An error occurred while processing your request. Please try again.", 500));
+    }
+}));
+exports.resetPassword = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { token, newPassword } = req.body;
+        // Validate input
+        if (!token || !newPassword) {
+            return next(new AppError_1.AppError("Reset token and new password are required", 400));
+        }
+        // Validate password
+        if (typeof newPassword !== "string") {
+            return next(new AppError_1.AppError("Password must be a string", 400));
+        }
+        if (newPassword.length < 6) {
+            return next(new AppError_1.AppError("Password must be at least 6 characters long", 400));
+        }
+        if (newPassword.length > 128) {
+            return next(new AppError_1.AppError("Password must not exceed 128 characters", 400));
+        }
+        // Optional: Add complexity check to match registration
+        if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(newPassword)) {
+            return next(new AppError_1.AppError("Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character", 400));
+        }
+        // Hash the provided token
+        const hashedToken = crypto
+            .createHash("sha256")
+            .update(token)
+            .digest("hex");
+        // Find user with valid token and non-expired reset period
+        const user = yield user_model_1.default.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() },
+        }).select("+password");
+        if (!user) {
+            return next(new AppError_1.AppError("Invalid or expired reset token", 400));
+        }
+        // Update password and clear reset fields
+        user.password = newPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        yield user.save();
+        res.status(200).json({
+            success: true,
+            message: "Password updated successfully. You can now log in.",
+        });
+    }
+    catch (error) {
+        console.error("Reset password error:", error);
+        return next(new AppError_1.AppError("An error occurred while resetting your password. Please try again.", 500));
     }
 }));

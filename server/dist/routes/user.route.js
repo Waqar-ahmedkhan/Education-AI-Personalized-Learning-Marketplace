@@ -6,21 +6,29 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const user_controller_1 = require("../Controllers/user.controller");
 const auth_1 = require("../middlewares/auth");
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const UserRoute = express_1.default.Router();
-UserRoute.post("/registration", user_controller_1.registerUser);
-UserRoute.post("/active-user", user_controller_1.activateUser);
-UserRoute.post("/login-user", user_controller_1.UserLogin);
-UserRoute.get("/logout-user", auth_1.isAuthenticated, user_controller_1.UserLogout);
-UserRoute.get("/refresh", user_controller_1.updateAccessToken);
-UserRoute.get("/me", auth_1.isAuthenticated, user_controller_1.getUserInformatin);
-UserRoute.post("/soical-auth", user_controller_1.socialAuth);
-UserRoute.put("/update-user-info", auth_1.isAuthenticated, user_controller_1.UpdateUserInformation);
-UserRoute.put("/update-password", auth_1.isAuthenticated, user_controller_1.UpdatePassword);
-UserRoute.put("/avatar-upload", auth_1.isAuthenticated, user_controller_1.UpdateProfilePicture);
-UserRoute.get("/get-users", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.getallUsers);
-UserRoute.put("/update-user-route", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.updateUserRoles);
-UserRoute.delete("/user-delete/:id", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.deleteUser);
-UserRoute.post("/create-admin", auth_1.isAuthenticated, (0, auth_1.authorizedRoles)("admin"), user_controller_1.createAdmin);
-// Route for creating the initial admin user (requires setup key)
-UserRoute.post("/setup-initial-admin", user_controller_1.createInitialAdmin);
+// Rate limiter for forget password
+const forgotPasswordLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5,
+    message: {
+        success: false,
+        message: "Too many requests, please try again later.",
+    },
+});
+// Public user routes
+UserRoute.post("/user/registration", user_controller_1.registerUser);
+UserRoute.post("/user/activate", user_controller_1.activateUser);
+UserRoute.post("/user/login", user_controller_1.UserLogin);
+UserRoute.post("/user/social-auth", user_controller_1.socialAuth);
+UserRoute.post("/user/forgot-password", forgotPasswordLimiter, user_controller_1.forgetPassword);
+UserRoute.post("/user/reset-password", user_controller_1.resetPassword);
+// Protected user routes
+UserRoute.get("/user/refresh", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.updateAccessToken);
+UserRoute.get("/user/logout", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.UserLogout);
+UserRoute.get("/user/me", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.getUserInformatin);
+UserRoute.put("/user/update-info", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.UpdateUserInformation);
+UserRoute.put("/user/update-password", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.UpdatePassword);
+UserRoute.put("/user/avatar-upload", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.UpdateProfilePicture);
 exports.default = UserRoute;

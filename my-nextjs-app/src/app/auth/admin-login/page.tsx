@@ -5,15 +5,6 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '@/lib/auth';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
-import axios from 'axios';
-
-interface LoginResponse {
-  success: boolean;
-  role?: string;
-  token?: string;
-  message?: string;
-  status?: number;
-}
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
@@ -23,15 +14,19 @@ export default function AdminLoginPage() {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const { theme, systemTheme } = useTheme();
-  const { login, userRole } = useAuth();
+  const { login, userRole, isAdmin } = useAuth();
   const router = useRouter();
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
     emailInputRef.current?.focus();
-    if (userRole === 'admin') router.push('/admin-dashboard');
-  }, [userRole, router]);
+    console.log('Checking userRole on mount:', userRole, 'isAdmin:', isAdmin);
+    if (isAdmin) {
+      console.log('Redirecting to /admin-dashboard');
+      router.push('/admin-dashboard');
+    }
+  }, [isAdmin, router]);
 
   const isDark = theme === 'system' ? systemTheme === 'dark' : theme === 'dark';
 
@@ -53,31 +48,19 @@ export default function AdminLoginPage() {
     if (!validateForm()) return;
     setError(null);
     setLoading(true);
+
     try {
-      const response = await axios.post<LoginResponse>(
-        `http://localhost:8080/api/v1/admin/login`,
-        { email, password },
-        { withCredentials: true } // For HTTP-only cookies
-      );
-      const data = response.data;
-      if (!data.success || data.role !== 'admin') {
-        throw new Error(data.message || 'Unauthorized: Admin access only');
-      }
-      await login(data.token || '', data.role);
-      router.push('/admin-dashboard');
-    } catch (err: unknown) {
-      if (err instanceof Error && err) {
-        const { message, status } = err as { message?: string; status?: number };
-        if (status === 401) {
-          setError(message || 'Invalid email or password');
-        } else if (status === 403) {
-          setError(message || 'Unauthorized: Admin access only');
-        } else {
-          setError(message || 'An error occurred during login');
-        }
-      } else {
-        setError('An error occurred during login');
-      }
+      console.log('Attempting login with email:', email);
+      await login(email, password);
+      console.log('Login successful, should redirect to /admin-dashboard');
+    } catch (error: unknown) {
+      const axiosError = error as { message?: string; response?: { status?: number; data?: unknown } };
+      console.error('Login error in AdminLoginPage:', {
+        message: axiosError?.message,
+        status: axiosError?.response?.status,
+        data: axiosError?.response?.data,
+      });
+      setError(axiosError?.message || 'An unexpected error occurred during login.');
     } finally {
       setLoading(false);
     }
@@ -106,32 +89,54 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'} p-4 sm:p-6`}>
+    <div
+      className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${
+        isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'
+      } p-4 sm:p-6`}
+    >
       <motion.div
-        className={`max-w-md w-full rounded-2xl p-8 backdrop-blur-lg ${isDark ? 'bg-gray-800/70 border border-gray-700/50' : 'bg-white/70 border border-gray-200/50'} shadow-xl`}
+        className={`max-w-md w-full rounded-2xl p-8 backdrop-blur-lg ${
+          isDark ? 'bg-gray-800/70 border border-gray-700/50' : 'bg-white/70 border border-gray-200/50'
+        } shadow-xl`}
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         <div className="text-center mb-8">
           <motion.div
-            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isDark ? 'bg-indigo-900/50' : 'bg-indigo-100/80'}`}
+            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              isDark ? 'bg-indigo-900/50' : 'bg-indigo-100/80'
+            }`}
             animate={{ scale: [1, 1.05, 1], transition: { duration: 1.5, repeat: Infinity } }}
           >
-            <svg className={`w-8 h-8 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-2.76 2.24-5 5-5s5 2.24 5 5v6h-5m-5-6c0-2.76-2.24-5-5-5S2 8.24 2 11v6h5m5-6v6m-5-6v6" />
+            <svg
+              className={`w-8 h-8 ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 11c0-2.76 2.24-5 5-5s5 2.24 5 5v6h-5m-5-6c0-2.76-2.24-5-5-5S2 8.24 2 11v6h5m5-6v6m-5-6v6"
+              />
             </svg>
           </motion.div>
           <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
             Admin Login
           </h1>
           <p className={`mt-2 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-            Secure access to the admin panel as of {new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' })}
+            Secure access to the admin panel as of{' '}
+            {new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' })}
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+            <label
+              htmlFor="email"
+              className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}
+            >
               Email
             </label>
             <motion.input
@@ -140,7 +145,9 @@ export default function AdminLoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className={`w-full p-3 rounded-lg border ${isDark ? 'bg-gray-700/50 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:ring-2 focus:ring-indigo-500 transition-all`}
+              className={`w-full p-3 rounded-lg border ${
+                isDark ? 'bg-gray-700/50 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'
+              } focus:ring-2 focus:ring-indigo-500 transition-all`}
               required
               placeholder="admin@example.com"
               aria-label="Admin email"
@@ -149,7 +156,10 @@ export default function AdminLoginPage() {
             />
           </div>
           <div className="relative">
-            <label htmlFor="password" className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+            <label
+              htmlFor="password"
+              className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`}
+            >
               Password
             </label>
             <motion.input
@@ -157,7 +167,9 @@ export default function AdminLoginPage() {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`w-full p-3 rounded-lg border ${isDark ? 'bg-gray-700/50 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:ring-2 focus:ring-indigo-500 transition-all`}
+              className={`w-full p-3 rounded-lg border ${
+                isDark ? 'bg-gray-700/50 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'
+              } focus:ring-2 focus:ring-indigo-500 transition-all`}
               required
               placeholder="••••••••"
               aria-label="Admin password"
@@ -176,7 +188,9 @@ export default function AdminLoginPage() {
           <motion.button
             type="submit"
             disabled={loading}
-            className={`w-full p-3 rounded-lg text-white ${loading ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'} transition-colors disabled:cursor-not-allowed`}
+            className={`w-full p-3 rounded-lg text-white ${
+              loading ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
+            } transition-colors disabled:cursor-not-allowed`}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -184,7 +198,11 @@ export default function AdminLoginPage() {
               <span className="flex items-center justify-center">
                 <svg className="animate-spin h-5 w-5 mr-2 text-white" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z" />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z"
+                  />
                 </svg>
                 Logging in...
               </span>
@@ -195,7 +213,9 @@ export default function AdminLoginPage() {
         </form>
         {error && (
           <motion.div
-            className={`mt-6 p-4 rounded-lg border ${isDark ? 'bg-red-900/20 border-red-500 text-red-400' : 'bg-red-50 border-red-200 text-red-600'}`}
+            className={`mt-6 p-4 rounded-lg border ${
+              isDark ? 'bg-red-900/20 border-red-500 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+            }`}
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -204,7 +224,11 @@ export default function AdminLoginPage() {
             <div className="flex items-center justify-between">
               <p className="text-sm flex items-center">
                 <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
                 </svg>
                 {error}
               </p>
@@ -221,7 +245,9 @@ export default function AdminLoginPage() {
         <div className="mt-6 text-center">
           <a
             href="/auth/forgot-password"
-            className={`text-sm ${isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-500'} transition-colors`}
+            className={`text-sm ${
+              isDark ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-500'
+            } transition-colors`}
           >
             Forgot Password?
           </a>

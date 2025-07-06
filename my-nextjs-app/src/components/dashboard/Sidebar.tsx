@@ -8,12 +8,12 @@ export default function Sidebar() {
   const { logout } = useAuth()
 
   const menuItems = [
-    { name: 'Users', path: '/dashboard/users', icon: <FaUsers /> },
-    { name: 'Courses', path: '/dashboard/courses', icon: <FaBook /> },
-    { name: 'Analytics', path: '/dashboard/analytics', icon: <FaChartBar /> },
-    { name: 'Notifications', path: '/dashboard/notifications', icon: <FaBell /> },
-    { name: 'Orders', path: '/dashboard/orders', icon: <FaShoppingCart /> },
-    { name: 'Layouts', path: '/dashboard/layouts', icon: <FaCogs /> },
+    { name: 'Users', path: '/admin-dashboard/users', icon: <FaUsers /> },
+    { name: 'Courses', path: '/admin-dashboard/courses', icon: <FaBook /> },
+    { name: 'Analytics', path: '/admin-dashboard/analytics', icon: <FaChartBar /> },
+    { name: 'Notifications', path: '/admin-dashboard/notifications', icon: <FaBell /> },
+    { name: 'Orders', path: '/admin-dashboard/orders', icon: <FaShoppingCart /> },
+    { name: 'Layouts', path: '/admin-dashboard/layouts', icon: <FaCogs /> },
   ]
 
   return (

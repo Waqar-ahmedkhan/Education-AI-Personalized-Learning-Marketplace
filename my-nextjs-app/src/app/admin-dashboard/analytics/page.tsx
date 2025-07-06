@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { Sun, Moon, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -57,8 +57,8 @@ const AnalyticsPage: React.FC = () => {
           orders: ordersRes.data.success ? ordersRes.data.orders ?? [] : [],
         });
       } catch (err) {
-        const error = err as AxiosError<{ message?: string }>;
-        setError(error.response?.data?.message ?? 'Failed to load analytics data');
+        const error = err as { message?: string };
+        setError(error?.message || 'Failed to load analytics data');
       } finally {
         setLoading(false);
       }

@@ -15,7 +15,7 @@ const AdminRoute = express.Router();
 AdminRoute.post('/admin/setup-initial-admin', createInitialAdmin);
 
 // Protected admin routes
-AdminRoute.post('/admin/login', isAuthenticated, isAdmin, adminLogin); // Reuse UserLogin with admin check
+AdminRoute.post('/admin/login', adminLogin); // Reuse UserLogin with admin check
 AdminRoute.get('/admin/users', isAuthenticated, isAdmin, getallUsers);
 AdminRoute.put('/admin/update-user-role', isAuthenticated, isAdmin, updateUserRoles);
 AdminRoute.delete('/admin/user-delete/:id', isAuthenticated, isAdmin, deleteUser);

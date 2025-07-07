@@ -152,5 +152,6 @@ export const sendToken = async (
     success: true,
     user,
     accessToken,
+    role: user.role,
   });
 };

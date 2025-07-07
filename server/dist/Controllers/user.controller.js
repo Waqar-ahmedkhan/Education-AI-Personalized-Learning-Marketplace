@@ -693,26 +693,34 @@ exports.deleteUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
 }));
 exports.adminLogin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log('Login attempt with body:', req.body);
         const { email, password } = req.body;
         if (!email || !password) {
+            console.log('Missing email or password');
             return next(new AppError_1.AppError('Please enter both email and password', 400));
         }
+        console.log('Querying user with email:', email);
         const user = yield user_model_1.default.findOne({ email }).select('+password');
+        console.log('User found:', user ? { id: user._id, email: user.email, role: user.role } : null);
         if (!user) {
             return next(new AppError_1.AppError('Incorrect email or password', 401));
         }
         if (user.role !== 'admin') {
+            console.log('Non-admin user attempted login:', user.role);
             return next(new AppError_1.AppError('This login is for admins only. Please use the user login.', 403));
         }
+        console.log('Comparing password for user:', email);
         const isPasswordMatch = yield user.comparePassword(password);
+        console.log('Password match result:', isPasswordMatch);
         if (!isPasswordMatch) {
             return next(new AppError_1.AppError('Incorrect email or password', 401));
         }
+        console.log('Calling sendToken for user:', user._id);
         (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (err) {
-        console.error('Error in admin login:', err);
-        return next(new AppError_1.AppError('Error during admin login', 500));
+        console.error('Error in admin login:', err.message, err.stack);
+        return next(new AppError_1.AppError(`Error during admin login: ${err.message}`, 500));
     }
 }));
 exports.createAdmin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {

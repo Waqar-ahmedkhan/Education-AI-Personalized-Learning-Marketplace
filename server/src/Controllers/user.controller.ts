@@ -861,30 +861,38 @@ export const deleteUser = CatchAsyncError(
 export const adminLogin = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      console.log('Login attempt with body:', req.body);
       const { email, password } = req.body as loginType;
 
       if (!email || !password) {
+        console.log('Missing email or password');
         return next(new AppError('Please enter both email and password', 400));
       }
 
+      console.log('Querying user with email:', email);
       const user = await UserModel.findOne({ email }).select('+password');
+      console.log('User found:', user ? { id: user._id, email: user.email, role: user.role } : null);
       if (!user) {
         return next(new AppError('Incorrect email or password', 401));
       }
 
       if (user.role !== 'admin') {
+        console.log('Non-admin user attempted login:', user.role);
         return next(new AppError('This login is for admins only. Please use the user login.', 403));
       }
 
+      console.log('Comparing password for user:', email);
       const isPasswordMatch = await user.comparePassword(password);
+      console.log('Password match result:', isPasswordMatch);
       if (!isPasswordMatch) {
         return next(new AppError('Incorrect email or password', 401));
       }
 
+      console.log('Calling sendToken for user:', user._id);
       sendToken(user, 200, res);
     } catch (err: any) {
-      console.error('Error in admin login:', err);
-      return next(new AppError('Error during admin login', 500));
+      console.error('Error in admin login:', err.message, err.stack);
+      return next(new AppError(`Error during admin login: ${err.message}`, 500));
     }
   }
 );

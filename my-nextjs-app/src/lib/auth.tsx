@@ -1,8 +1,19 @@
-"use client";
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import axios from 'axios';
+
+// Custom AxiosError type without 'any'
+type CustomAxiosError<T = unknown> = {
+  isAxiosError: boolean;
+  message: string;
+  response?: {
+    data?: T;
+    status?: number;
+    headers?: Record<string, unknown>;
+  };
+  config?: Record<string, unknown>;
+};
 
 interface LoginResponse {
   success: boolean;
@@ -41,15 +52,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchUserRole = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      console.log('Fetching user role from:', `${baseUrl}/api/v1/me`);
       const res = await axios.get<{ role: string }>(`${baseUrl}/api/v1/me`, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
-      console.log('User role fetched:', res.data.role);
       setUserRole(res.data.role);
     } catch (error: unknown) {
-      const axiosError = error as  Error<{ message?: string }>;
+      const axiosError = error as CustomAxiosError<{ message?: string }>;
       console.error('Failed to fetch user role:', {
         status: axiosError.response?.status,
         data: axiosError.response?.data,
@@ -63,8 +72,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
       const loginUrl = `${baseUrl}/api/v1/admin/login`;
-      console.log('Sending login request to:', loginUrl);
-      console.log('Request payload:', { email, password });
 
       const res = await axios.post<LoginResponse>(
         loginUrl,
@@ -73,12 +80,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           withCredentials: true,
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
+            Accept: 'application/json',
           },
         }
       );
-
-      console.log('Login response:', res.data);
 
       if (!res.data.success || !res.data.accessToken || res.data.user.role !== 'admin') {
         throw new Error(res.data.message || 'Unauthorized: Admin access only');
@@ -90,22 +95,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
       });
+
       setToken(res.data.accessToken);
       setUserRole(res.data.user.role);
-      console.log('Token and role set:', { token: res.data.accessToken, role: res.data.user.role });
       router.push('/admin-dashboard');
     } catch (error: unknown) {
-      const axiosError = error as Error<{ message?: string }>;
+      const axiosError = error as CustomAxiosError<{ message?: string }>;
+      const status = axiosError.response?.status;
+      const message =
+        axiosError.response?.data?.message ||
+        axiosError.message ||
+        'An unexpected error occurred';
+
       console.error('Login error:', {
-        status: axiosError.response?.status,
+        status,
         data: axiosError.response?.data,
-        message: axiosError.message,
-        config: axiosError.config,
-        headers: axiosError.response?.headers,
+        message,
       });
 
-      const status = axiosError.response?.status;
-      const message = axiosError.response?.data?.message || 'Request failed';
       if (status === 404) {
         throw new Error('API endpoint not found. Please check the server URL.');
       } else if (status === 401) {
@@ -115,6 +122,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else if (!axiosError.response) {
         throw new Error('Network error: Unable to reach the server.');
       }
+
       throw new Error(message);
     }
   };
@@ -122,13 +130,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      console.log('Attempting logout via:', `${baseUrl}/api/v1/logout-user`);
       await axios.get(`${baseUrl}/api/v1/logout-user`, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
     } catch (error: unknown) {
-      const axiosError = error as Error<{ message?: string }>;
+      const axiosError = error as CustomAxiosError<{ message?: string }>;
       console.error('Logout error:', {
         status: axiosError.response?.status,
         data: axiosError.response?.data,
@@ -138,7 +145,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       Cookies.remove('access_token');
       setToken(null);
       setUserRole(null);
-      console.log('Logged out, redirecting to /login');
       router.push('/login');
     }
   };

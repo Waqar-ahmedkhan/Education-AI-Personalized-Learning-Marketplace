@@ -6,20 +6,22 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/admin-dashboard')) {
     if (!token) {
-      return NextResponse.redirect(new URL('/auth/login?error=Please log in', request.url));
+      return NextResponse.redirect(new URL('/auth/admin-login?error=Please log in', request.url));
     }
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/me`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/me`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });
       const data = await res.json() as { success: boolean; user: { role: string } };
       if (!data.success || data.user.role !== 'admin') {
+        request.cookies.delete('access_token');
         return NextResponse.redirect(
           new URL('/forbidden?error=Access denied. Admin role required.', request.url)
         );
       }
     } catch {
+      request.cookies.delete('access_token');
       return NextResponse.redirect(new URL('/forbidden?error=Invalid token', request.url));
     }
   }
@@ -29,22 +31,24 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login?error=Please log in', request.url));
     }
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/me`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/me`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });
       const data = await res.json() as { success: boolean; user: { role: string } };
       if (!data.success) {
+        request.cookies.delete('access_token');
         return NextResponse.redirect(new URL('/forbidden?error=Invalid token', request.url));
       }
     } catch {
+      request.cookies.delete('access_token');
       return NextResponse.redirect(new URL('/forbidden?error=Invalid token', request.url));
     }
   }
 
   if (pathname === '/auth/login' && token) {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/me`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/me`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });
@@ -60,7 +64,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/initial-admin' && token) {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/me`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/me`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });

@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(Cookies.get('access_token') || null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(!!token);
+  const [isLoading, setIsLoading] = useState<boolean>(!!token); // Start loading if token exists
   const router = useRouter();
 
   useEffect(() => {
@@ -35,9 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     if (token && !userRole) {
       fetchUserData();
-    } else if (!token && userRole) {
-      // Token is missing but role exists, likely a stale session
-      logout();
     }
   }, [token]);
 
@@ -96,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         expires: 7,
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict', // Changed to 'strict' for better security
+        sameSite: 'lax',
       });
 
       setToken(res.data.accessToken);
@@ -135,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      Cookies.remove('access_token', { path: '/' });
+      Cookies.remove('access_token');
       setToken(null);
       setUserRole(null);
       setUserName(null);

@@ -1,52 +1,82 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import axios from 'axios'
-import Cookies from 'js-cookie'
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  const token = request.cookies.get('access_token')?.value
-  const { pathname } = request.nextUrl
+  const token = request.cookies.get('access_token')?.value;
+  const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith('/dashboard')) {
+  if (pathname.startsWith('/admin-dashboard')) {
     if (!token) {
-      return NextResponse.redirect(new URL('/admin-login', request.url))
+      return NextResponse.redirect(new URL('/auth/login?error=Please log in', request.url));
     }
     try {
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/me`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/me`, {
         headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = res.data as { role?: string }
-      if (data.role !== 'admin') {
-        Cookies.remove('access_token')
-        return NextResponse.redirect(new URL('/admin-login?error=Access denied. Admin role required.', request.url))
+        credentials: 'include',
+      });
+      const data = await res.json() as { success: boolean; user: { role: string } };
+      if (!data.success || data.user.role !== 'admin') {
+        return NextResponse.redirect(
+          new URL('/forbidden?error=Access denied. Admin role required.', request.url)
+        );
       }
-    } catch{
-      Cookies.remove('access_token')
-      return NextResponse.redirect(new URL('/admin-login', request.url))
+    } catch {
+      return NextResponse.redirect(new URL('/forbidden?error=Invalid token', request.url));
     }
   }
 
-  if (pathname === '/admin-login' && token) {
+  if (pathname.startsWith('/user-dashboard')) {
+    if (!token) {
+      return NextResponse.redirect(new URL('/auth/login?error=Please log in', request.url));
+    }
     try {
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/me`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/me`, {
         headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = res.data as { role?: string }
-      if (data.role === 'admin') {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+        credentials: 'include',
+      });
+      const data = await res.json() as { success: boolean; user: { role: string } };
+      if (!data.success) {
+        return NextResponse.redirect(new URL('/forbidden?error=Invalid token', request.url));
       }
-    } catch{
-      return NextResponse.next()
+    } catch {
+      return NextResponse.redirect(new URL('/forbidden?error=Invalid token', request.url));
     }
   }
 
-  if (pathname === '/Initial-admin' && token) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (pathname === '/auth/login' && token) {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
+      const data = await res.json() as { success: boolean; user: { role: string } };
+      if (data.success) {
+        const redirectUrl = data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard';
+        return NextResponse.redirect(new URL(redirectUrl, request.url));
+      }
+    } catch {
+      return NextResponse.next();
+    }
   }
 
-  return NextResponse.next()
+  if (pathname === '/initial-admin' && token) {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
+      const data = await res.json() as { success: boolean; user: { role: string } };
+      if (data.success) {
+        const redirectUrl = data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard';
+        return NextResponse.redirect(new URL(redirectUrl, request.url));
+      }
+    } catch {
+      return NextResponse.next();
+    }
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin-login', '/initial-admin'],
-}
+  matcher: ['/admin-dashboard/:path*', '/user-dashboard/:path*', '/auth/login', '/initial-admin'],
+};

@@ -17,6 +17,9 @@ import {
 } from "../services/user.services";
 import cloudinary from "cloudinary";
 import * as crypto from "crypto";
+import { OAuth2Client } from "google-auth-library";
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 
 interface IRegistrationBody {
   name: string;
@@ -643,32 +646,123 @@ export const getUserInformatin = async (
   }
 };
 
-interface ISoicalAuth {
-  name: string;
-  email: string;
-  avatar: string;
+
+
+interface IGoogleAuth {
+  token: string; // Google ID token
 }
 
 export const socialAuth = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { email, name, avatar } = req.body as ISoicalAuth;
-      if (!email || !name || !avatar) {
-        return next(new AppError("Please provide all required fields", 400));
+      const { token } = req.body as IGoogleAuth;
+
+      // Validate input
+      if (!token) {
+        return next(new AppError("Google ID token is required", 400));
       }
 
-      const user = await UserModel.create({ email, name, avatar });
-      if (!user) {
-        const newUser = await UserModel.create({ email, name, avatar });
-        sendToken(newUser, 200, res);
-      } else {
-        sendToken(user, 200, res);
+      // Verify Google ID token
+      let ticket;
+      try {
+        ticket = await googleClient.verifyIdToken({
+          idToken: token,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+      } catch (error: any) {
+        console.error("Google token verification error:", error);
+        return next(new AppError("Invalid or expired Google ID token", 401));
       }
-    } catch (err) {
-      console.log("error is not gooded");
+
+      const payload = ticket.getPayload();
+      if (!payload) {
+        return next(new AppError("Invalid Google token payload", 401));
+      }
+
+      const { email, name, picture } = payload;
+
+      // Validate required fields
+      if (!email || !name) {
+        return next(
+          new AppError("Email and name are required from Google profile", 400)
+        );
+      }
+
+      // Normalize email
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Check if user exists
+      let user = await UserModel.findOne({ email: normalizedEmail });
+
+      if (!user) {
+        // Create new user
+        user = await UserModel.create({
+          name: name.trim(),
+          email: normalizedEmail,
+          avatar: picture
+            ? { public_id: `google_${payload.sub}`, url: picture }
+            : undefined,
+          isVerified: true, // Google users are auto-verified
+          role: "user",
+          socialAuthProvider: "google", // Track Google auth
+          courses: [],
+          preferences: [],
+          recommendedCourses: [],
+          courseProgress: [],
+          interactionHistory: [],
+        });
+
+        console.log(`New Google user created: ${normalizedEmail}`);
+      } else {
+        // Update avatar if provided and user doesn't have one
+        if (picture && !user.avatar?.public_id) {
+          user.avatar = {
+            public_id: `google_${payload.sub}`,
+            url: picture,
+          };
+          await user.save();
+        }
+      }
+
+      // Send tokens and cache user in Redis
+      await sendToken(user, 200, res);
+    } catch (err: any) {
+      console.error("Google social auth error:", err);
+      return next(
+        new AppError(
+          err.message || "Error during Google authentication",
+          500
+        )
+      );
     }
   }
 );
+// interface ISoicalAuth {
+//   name: string;
+//   email: string;
+//   avatar: string;
+// }
+
+// export const socialAuth = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const { email, name, avatar } = req.body as ISoicalAuth;
+//       if (!email || !name || !avatar) {
+//         return next(new AppError("Please provide all required fields", 400));
+//       }
+
+//       const user = await UserModel.create({ email, name, avatar });
+//       if (!user) {
+//         const newUser = await UserModel.create({ email, name, avatar });
+//         sendToken(newUser, 200, res);
+//       } else {
+//         sendToken(user, 200, res);
+//       }
+//     } catch (err) {
+//       console.log("error is not gooded");
+//     }
+//   }
+// );
 interface IUpdateUserInterface {
   name: string;
   email: string;

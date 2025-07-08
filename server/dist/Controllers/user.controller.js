@@ -46,6 +46,8 @@ const RedisConnect_1 = require("../utils/RedisConnect");
 const user_services_1 = require("../services/user.services");
 const cloudinary_1 = __importDefault(require("cloudinary"));
 const crypto = __importStar(require("crypto"));
+const google_auth_library_1 = require("google-auth-library");
+const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const createActivationToken = (user) => {
     if (!process.env.ACTIVATION_SECRET) {
         throw new Error("ACTIVATION_SECRET is not defined in environment variables");
@@ -535,22 +537,73 @@ const getUserInformatin = (req, res, next) => __awaiter(void 0, void 0, void 0, 
 });
 exports.getUserInformatin = getUserInformatin;
 exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const { email, name, avatar } = req.body;
-        if (!email || !name || !avatar) {
-            return next(new AppError_1.AppError("Please provide all required fields", 400));
+        const { token } = req.body;
+        // Validate input
+        if (!token) {
+            return next(new AppError_1.AppError("Google ID token is required", 400));
         }
-        const user = yield user_model_1.default.create({ email, name, avatar });
+        // Verify Google ID token
+        let ticket;
+        try {
+            ticket = yield googleClient.verifyIdToken({
+                idToken: token,
+                audience: process.env.GOOGLE_CLIENT_ID,
+            });
+        }
+        catch (error) {
+            console.error("Google token verification error:", error);
+            return next(new AppError_1.AppError("Invalid or expired Google ID token", 401));
+        }
+        const payload = ticket.getPayload();
+        if (!payload) {
+            return next(new AppError_1.AppError("Invalid Google token payload", 401));
+        }
+        const { email, name, picture } = payload;
+        // Validate required fields
+        if (!email || !name) {
+            return next(new AppError_1.AppError("Email and name are required from Google profile", 400));
+        }
+        // Normalize email
+        const normalizedEmail = email.trim().toLowerCase();
+        // Check if user exists
+        let user = yield user_model_1.default.findOne({ email: normalizedEmail });
         if (!user) {
-            const newUser = yield user_model_1.default.create({ email, name, avatar });
-            (0, jwt_1.sendToken)(newUser, 200, res);
+            // Create new user
+            user = yield user_model_1.default.create({
+                name: name.trim(),
+                email: normalizedEmail,
+                avatar: picture
+                    ? { public_id: `google_${payload.sub}`, url: picture }
+                    : undefined,
+                isVerified: true, // Google users are auto-verified
+                role: "user",
+                socialAuthProvider: "google", // Track Google auth
+                courses: [],
+                preferences: [],
+                recommendedCourses: [],
+                courseProgress: [],
+                interactionHistory: [],
+            });
+            console.log(`New Google user created: ${normalizedEmail}`);
         }
         else {
-            (0, jwt_1.sendToken)(user, 200, res);
+            // Update avatar if provided and user doesn't have one
+            if (picture && !((_a = user.avatar) === null || _a === void 0 ? void 0 : _a.public_id)) {
+                user.avatar = {
+                    public_id: `google_${payload.sub}`,
+                    url: picture,
+                };
+                yield user.save();
+            }
         }
+        // Send tokens and cache user in Redis
+        yield (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (err) {
-        console.log("error is not gooded");
+        console.error("Google social auth error:", err);
+        return next(new AppError_1.AppError(err.message || "Error during Google authentication", 500));
     }
 }));
 exports.UpdateUserInformation = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {

@@ -35,12 +35,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// models/user.model.ts
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const mongoose_1 = __importStar(require("mongoose"));
-const crypto = __importStar(require("crypto")); // Added for reset token generation
-require("dotenv/config"); // Use ES module syntax for dotenv
-// User Schema definition
+const crypto = __importStar(require("crypto"));
+require("dotenv/config");
 const userSchema = new mongoose_1.Schema({
     name: { type: String, required: [true, "Please enter your name"] },
     email: {
@@ -56,15 +56,22 @@ const userSchema = new mongoose_1.Schema({
     },
     password: {
         type: String,
-        required: [true, "Please enter your password"],
+        required: [
+            function () {
+                return !this.socialAuthProvider; // Password required only if no social auth provider
+            },
+            "Please enter your password",
+        ],
         minlength: [8, "Password must be at least 8 characters"],
         validate: {
             validator: function (value) {
-                return /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(value);
+                return value
+                    ? /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(value)
+                    : true; // Skip validation if password is undefined
             },
             message: "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
         },
-        select: false, // Don't return password in queries
+        select: false,
     },
     avatar: {
         public_id: { type: String, required: false },
@@ -83,7 +90,6 @@ const userSchema = new mongoose_1.Schema({
     preferences: {
         type: [String],
         default: [],
-        // Removed required to avoid conflict with default empty array
     },
     recommendedCourses: [
         {
@@ -123,37 +129,20 @@ const userSchema = new mongoose_1.Schema({
             duration: { type: Number, required: true, min: 0 },
         },
     ],
-    resetPasswordToken: { type: String, select: false }, // Added for password reset
-    resetPasswordExpires: { type: Date, select: false }, // Added for password reset
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
+    socialAuthProvider: {
+        type: String,
+        enum: ["google", "facebook", "github"],
+        required: false,
+    },
 }, {
     timestamps: true,
 });
-// Sign Access Token
-userSchema.methods.SignAccessToken = function () {
-    return jsonwebtoken_1.default.sign({ id: this._id, role: this.role }, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: process.env.ACCESS_TOKEN_EXPIRE || "15m",
-    });
-};
-// Sign Refresh Token
-userSchema.methods.SignRefreshToken = function () {
-    return jsonwebtoken_1.default.sign({ id: this._id, role: this.role }, process.env.REFRESH_TOKEN_SECRET, {
-        expiresIn: process.env.REFRESH_TOKEN_EXPIRE || "7d",
-    });
-};
-// Generate Reset Token
-userSchema.methods.generateResetToken = function () {
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    this.resetPasswordToken = crypto
-        .createHash("sha256")
-        .update(resetToken)
-        .digest("hex");
-    this.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-    return resetToken;
-};
 // Hash Password Before Saving
 userSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (!this.isModified("password")) {
+        if (!this.isModified("password") || !this.password) {
             return next();
         }
         try {
@@ -179,13 +168,35 @@ userSchema.methods.comparePassword = function (candidatePassword) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             if (!this.password)
-                throw new Error("Password not available");
+                return false; // No password for social auth users
             return yield bcryptjs_1.default.compare(candidatePassword, this.password);
         }
         catch (error) {
             throw new Error("Password comparison failed");
         }
     });
+};
+// Sign Access Token
+userSchema.methods.SignAccessToken = function () {
+    return jsonwebtoken_1.default.sign({ id: this._id, role: this.role }, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: process.env.ACCESS_TOKEN_EXPIRE || "15m",
+    });
+};
+// Sign Refresh Token
+userSchema.methods.SignRefreshToken = function () {
+    return jsonwebtoken_1.default.sign({ id: this._id, role: this.role }, process.env.REFRESH_TOKEN_SECRET, {
+        expiresIn: process.env.REFRESH_TOKEN_EXPIRE || "7d",
+    });
+};
+// Generate Reset Token
+userSchema.methods.generateResetToken = function () {
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    this.resetPasswordToken = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+    this.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000);
+    return resetToken;
 };
 // Export the User Model
 const UserModel = mongoose_1.default.model("User", userSchema);

@@ -1,11 +1,12 @@
-'use client'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth'
-import { FaUsers, FaBook, FaChartBar, FaBell, FaShoppingCart, FaCogs } from 'react-icons/fa'
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { FaUsers, FaBook, FaChartBar, FaBell, FaShoppingCart, FaCogs } from 'react-icons/fa';
 
 export default function Sidebar() {
-  const router = useRouter()
-  const { logout } = useAuth()
+  const router = useRouter();
+  const { logout } = useAuth();
 
   const menuItems = [
     { name: 'Users', path: '/admin-dashboard/users', icon: <FaUsers /> },
@@ -14,10 +15,10 @@ export default function Sidebar() {
     { name: 'Notifications', path: '/admin-dashboard/notifications', icon: <FaBell /> },
     { name: 'Orders', path: '/admin-dashboard/orders', icon: <FaShoppingCart /> },
     { name: 'Layouts', path: '/admin-dashboard/layouts', icon: <FaCogs /> },
-  ]
+  ];
 
   return (
-    <div className="w-64 h-screen bg-gray-800 text-white fixed">
+    <div className="w-64 h-screen bg-gray-800 dark:bg-gray-900 text-white dark:text-gray-100 fixed">
       <div className="p-4">
         <h2 className="text-2xl font-bold">Admin Panel</h2>
       </div>
@@ -25,7 +26,7 @@ export default function Sidebar() {
         {menuItems.map((item) => (
           <div
             key={item.name}
-            className="flex items-center p-4 hover:bg-gray-700 cursor-pointer"
+            className="flex items-center p-4 hover:bg-gray-700 dark:hover:bg-gray-800 cursor-pointer"
             onClick={() => router.push(item.path)}
           >
             {item.icon}
@@ -33,12 +34,12 @@ export default function Sidebar() {
           </div>
         ))}
         <div
-          className="flex items-center p-4 hover:bg-gray-700 cursor-pointer"
+          className="flex items-center p-4 hover:bg-gray-700 dark:hover:bg-gray-800 cursor-pointer"
           onClick={logout}
         >
           <span>Logout</span>
         </div>
       </nav>
     </div>
-  )
+  );
 }

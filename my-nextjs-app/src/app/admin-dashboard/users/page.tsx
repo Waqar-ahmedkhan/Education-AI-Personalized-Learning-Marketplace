@@ -1,49 +1,179 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Sun, Moon } from 'lucide-react';
-import UserTable from '@/components/dashboard/UserTable';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '@/lib/auth';
+import { toast } from 'react-hot-toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
-const UsersPage: React.FC = () => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
 
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+export default function UserTable() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [newAdmin, setNewAdmin] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const { token } = useAuth();
+
+  const fetchUsers = async () => {
+    try {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/get-users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setUsers((res.data as { users: User[] }).users);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to fetch users: ${errorMessage}`);
+      toast.error('Failed to fetch users');
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchUsers();
+  }, [token]);
+
+  const handleUpdateRole = async (id: string, role: string) => {
+    try {
+      await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL}/update-user-route`,
+        { id, role },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchUsers();
+      toast.success('Role updated successfully');
+    } catch {
+      setError('Failed to update role');
+      toast.error('Failed to update role');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/user-delete/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchUsers();
+      toast.success('User deleted successfully');
+    } catch {
+      setError('Failed to delete user');
+      toast.error('Failed to delete user');
+    }
+  };
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/create-admin`,
+        newAdmin,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setNewAdmin({ email: '', password: '' });
+      fetchUsers();
+      toast.success('Admin created successfully');
+    } catch {
+      setError('Failed to create admin');
+      toast.error('Failed to create admin');
+    }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-500`}
-    >
-      <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-10">
-          <motion.h2
-            initial={{ y: -20 }}
-            animate={{ y: 0 }}
-            className="text-3xl font-bold tracking-tight sm:text-4xl"
-          >
-            User Management
-          </motion.h2>
-          <button
-            onClick={toggleTheme}
-            className="p-2.5 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-          >
-            {theme === 'light' ? (
-              <Moon className="h-5 w-5 text-gray-800" />
-            ) : (
-              <Sun className="h-5 w-5 text-yellow-400" />
-            )}
-          </button>
+    <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg m-6">
+      <CardHeader>
+        <CardTitle className="text-xl font-semibold text-text-light dark:text-text-dark">
+          User Management
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {error && <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-2 text-text-light dark:text-text-dark">
+            Create New Admin
+          </h3>
+          <form onSubmit={handleCreateAdmin} className="flex space-x-4">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={newAdmin.email}
+              onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+              className="border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-text-light dark:text-text-dark"
+              required
+            />
+            <Input
+              type="password"
+              placeholder="Password"
+              value={newAdmin.password}
+              onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+              className="border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-text-light dark:text-text-dark"
+              required
+            />
+            <Button
+              type="submit"
+              className="bg-primary-light dark:bg-primary-dark text-white hover:bg-primary-dark dark:hover:bg-primary-light"
+            >
+              Create
+            </Button>
+          </form>
         </div>
-        <UserTable theme={theme} />
-      </div>
-    </motion.div>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600">
+              <TableHead className="font-semibold text-text-light dark:text-text-dark">Name</TableHead>
+              <TableHead className="font-semibold text-text-light dark:text-text-dark">Email</TableHead>
+              <TableHead className="font-semibold text-text-light dark:text-text-dark">Role</TableHead>
+              <TableHead className="font-semibold text-text-light dark:text-text-dark">Created At</TableHead>
+              <TableHead className="font-semibold text-text-light dark:text-text-dark">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow
+                key={user._id}
+                className="hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <TableCell className="text-text-light dark:text-text-dark">{user.name}</TableCell>
+                <TableCell className="text-text-light dark:text-text-dark">{user.email}</TableCell>
+                <TableCell className="text-text-light dark:text-text-dark">
+                  <select
+                    value={user.role}
+                    onChange={(e) => handleUpdateRole(user._id, e.target.value)}
+                    className="p-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-text-light dark:text-text-dark rounded"
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </TableCell>
+                <TableCell className="text-text-light dark:text-text-dark">
+                  {new Date(user.createdAt).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    onClick={() => handleDelete(user._id)}
+                    className="bg-red-500 dark:bg-red-600 text-white hover:bg-red-600 dark:hover:bg-red-700 px-2 py-1 rounded"
+                  >
+                    Delete
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
-};
-
-export default UsersPage;
+}

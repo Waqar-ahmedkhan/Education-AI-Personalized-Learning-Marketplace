@@ -1,36 +1,16 @@
+'use client';
+
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import axios from 'axios';
-
-// Custom AxiosError type without 'any'
-type CustomAxiosError<T = unknown> = {
-  isAxiosError: boolean;
-  message: string;
-  response?: {
-    data?: T;
-    status?: number;
-    headers?: Record<string, unknown>;
-  };
-  config?: Record<string, unknown>;
-};
-
-interface LoginResponse {
-  success: boolean;
-  accessToken: string;
-  user: {
-    _id: string;
-    name: string;
-    email: string;
-    role: string;
-    isVerified: boolean;
-  };
-  message?: string;
-}
+import { LoginResponse, CustomAxiosError } from '@/types';
 
 interface AuthContextType {
   token: string | null;
   userRole: string | null;
+  userName: string | null;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
@@ -38,43 +18,66 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(Cookies.get('access_token') || null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(!!token);
   const router = useRouter();
 
   useEffect(() => {
+    const storedData = sessionStorage.getItem('userData');
+    if (storedData) {
+      const { role, name } = JSON.parse(storedData);
+      setUserRole(role);
+      setUserName(name);
+      setIsLoading(false);
+    }
     if (token && !userRole) {
-      fetchUserRole();
+      fetchUserData();
+    } else if (!token && userRole) {
+      // Token is missing but role exists, likely a stale session
+      logout();
     }
   }, [token]);
 
-  const fetchUserRole = async () => {
+  const fetchUserData = async () => {
+    setIsLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const res = await axios.get<{ role: string }>(`${baseUrl}/api/v1/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
-      });
-      setUserRole(res.data.role);
-    } catch (error: unknown) {
+      const res = await axios.get<{ success: boolean; user: { _id: string; name: string; role: string; email: string; isVerified: boolean } }>(
+        `${baseUrl}/api/v1/me`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        }
+      );
+      if (res.data.success) {
+        setUserRole(res.data.user.role);
+        setUserName(res.data.user.name);
+        sessionStorage.setItem('userData', JSON.stringify({ role: res.data.user.role, name: res.data.user.name }));
+      } else {
+        logout();
+      }
+    } catch (error) {
       const axiosError = error as CustomAxiosError<{ message?: string }>;
-      console.error('Failed to fetch user role:', {
+      console.error('Failed to fetch user data:', {
         status: axiosError.response?.status,
         data: axiosError.response?.data,
         message: axiosError.message,
       });
-      await logout();
+      logout();
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const login = async (email: string, password: string) => {
+    setIsLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const loginUrl = `${baseUrl}/api/v1/admin/login`;
-
       const res = await axios.post<LoginResponse>(
-        loginUrl,
+        `${baseUrl}/api/v1/admin/login`,
         { email, password },
         {
           withCredentials: true,
@@ -85,21 +88,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       );
 
-      if (!res.data.success || !res.data.accessToken || res.data.user.role !== 'admin') {
-        throw new Error(res.data.message || 'Unauthorized: Admin access only');
+      if (!res.data.success || !res.data.accessToken) {
+        throw new Error(res.data.message || 'Login failed');
       }
 
       Cookies.set('access_token', res.data.accessToken, {
         expires: 7,
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'strict', // Changed to 'strict' for better security
       });
 
       setToken(res.data.accessToken);
       setUserRole(res.data.user.role);
-      router.push('/admin-dashboard');
-    } catch (error: unknown) {
+      setUserName(res.data.user.name);
+      sessionStorage.setItem('userData', JSON.stringify({ role: res.data.user.role, name: res.data.user.name }));
+      router.push(res.data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard');
+    } catch (error) {
       const axiosError = error as CustomAxiosError<{ message?: string }>;
       const status = axiosError.response?.status;
       const message =
@@ -107,57 +112,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         axiosError.message ||
         'An unexpected error occurred';
 
-      console.error('Login error:', {
-        status,
-        data: axiosError.response?.data,
-        message,
-      });
+      console.error('Login error:', { status, data: axiosError.response?.data, message });
 
-      if (status === 404) {
-        throw new Error('API endpoint not found. Please check the server URL.');
-      } else if (status === 401) {
-        throw new Error('Invalid email or password');
-      } else if (status === 403) {
-        throw new Error('Unauthorized: Admin access only');
-      } else if (!axiosError.response) {
-        throw new Error('Network error: Unable to reach the server.');
-      }
-
+      if (status === 404) throw new Error('API endpoint not found');
+      if (status === 401) throw new Error('Invalid email or password');
+      if (status === 403) throw new Error('Unauthorized: Admin access only');
+      if (!axiosError.response) throw new Error('Network error: Unable to reach server');
       throw new Error(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const logout = async () => {
+    setIsLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
       await axios.get(`${baseUrl}/api/v1/logout-user`, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
-    } catch (error: unknown) {
-      const axiosError = error as CustomAxiosError<{ message?: string }>;
-      console.error('Logout error:', {
-        status: axiosError.response?.status,
-        data: axiosError.response?.data,
-        message: axiosError.message,
-      });
+    } catch (error) {
+      console.error('Logout error:', error);
     } finally {
-      Cookies.remove('access_token');
+      Cookies.remove('access_token', { path: '/' });
       setToken(null);
       setUserRole(null);
-      router.push('/login');
+      setUserName(null);
+      sessionStorage.clear();
+      router.push('/auth/login');
+      setIsLoading(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ token, userRole, login, logout, isAdmin: userRole === 'admin' }}>
+    <AuthContext.Provider value={{ token, userRole, userName, isLoading, login, logout, isAdmin: userRole === 'admin' }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
-};
+}

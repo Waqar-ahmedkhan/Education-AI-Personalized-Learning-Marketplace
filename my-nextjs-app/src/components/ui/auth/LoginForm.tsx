@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, RefObject } from 'react';
 import { useTheme } from 'next-themes';
 
 interface LoginData {
@@ -14,7 +14,7 @@ interface FormErrors {
 }
 
 interface LoginFormProps {
-  emailInputRef: React.RefObject<HTMLInputElement>;
+ emailInputRef: RefObject<HTMLInputElement | null>;
   initialEmail: string;
   onSuccess: (data: ApiResponse) => void;
   generalError: string | null;

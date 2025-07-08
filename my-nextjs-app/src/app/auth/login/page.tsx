@@ -1,68 +1,71 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useTheme } from 'next-themes'
-import LoginForm from '@/components/ui/auth/LoginForm'
-import SocialAuthButtons from '@/components/ui/auth/SoicalAuthButtons'
-import AuthLinks from '@/components/ui/auth/AuthLinks'
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useTheme } from 'next-themes';
+import LoginForm from '@/components/ui/auth/LoginForm';
+import SocialAuthButtons from '@/components/ui/auth/SoicalAuthButtons';
+import AuthLinks from '@/components/ui/auth/AuthLinks';
 
 interface ApiResponse {
-  success: boolean
-  message?: string
+  success: boolean;
+  message?: string;
   user?: {
-    _id: string
-    name: string
-    email: string
-    role: string
-    isVerified: boolean
-  }
-  accessToken?: string
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+    isVerified: boolean;
+  };
+  accessToken?: string;
 }
 
 export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [generalError, setGeneralError] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { theme, systemTheme } = useTheme()
-  const emailInputRef = useRef<HTMLInputElement>(null) as React.RefObject<HTMLInputElement>
+  const [isLoading, setIsLoading] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { theme, systemTheme } = useTheme();
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setMounted(true)
-    emailInputRef.current?.focus()
-  }, [])
+    setMounted(true);
+    emailInputRef.current?.focus();
+  }, []);
 
-  const isDark = theme === 'system' ? systemTheme === 'dark' : theme === 'dark'
+  const isDark = theme === 'system' ? systemTheme === 'dark' : theme === 'dark';
 
   const handleLoginSuccess = (data: ApiResponse) => {
     if (data.success && data.user && data.accessToken) {
-      sessionStorage.setItem('userData', JSON.stringify({
-        _id: data.user._id,
-        name: data.user.name,
-        email: data.user.email,
-        role: data.user.role,
-      }))
-      sessionStorage.setItem('accessToken', data.accessToken)
+      sessionStorage.setItem(
+        'userData',
+        JSON.stringify({
+          _id: data.user._id,
+          name: data.user.name,
+          email: data.user.email,
+          role: data.user.role,
+        })
+      );
+      sessionStorage.setItem('accessToken', data.accessToken);
 
       if (!data.user.isVerified) {
-        sessionStorage.setItem('activationToken', data.accessToken)
-        router.push(`/activation?email=${encodeURIComponent(data.user.email)}`)
+        sessionStorage.setItem('activationToken', data.accessToken);
+        router.push(`/activation?email=${encodeURIComponent(data.user.email)}`);
       } else {
-        router.push('/user-dashboard')
+        router.push('/user-dashboard');
       }
     } else {
-      setGeneralError(data.message || 'Invalid email or password')
+      setGeneralError(data.message || 'Invalid email or password');
     }
-  }
+  };
 
   if (!mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="h-8 w-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
-    )
+    );
   }
 
   return (
@@ -83,7 +86,7 @@ export default function LoginPage() {
         </div>
 
         <LoginForm
-          emailInputRef={emailInputRef}
+          emailInputRef={emailInputRef}   
           initialEmail={searchParams.get('email') || ''}
           onSuccess={handleLoginSuccess}
           setGeneralError={setGeneralError}
@@ -112,5 +115,5 @@ export default function LoginPage() {
         <AuthLinks />
       </div>
     </div>
-  )
+  );
 }

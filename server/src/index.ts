@@ -11,6 +11,7 @@ import courseRouter from "./routes/course.route";
 import orderRoute from "./routes/order.route";
 import notificationRoute from "./routes/notification.route";
 import AdminRoute from "./routes/admin.route";
+import analyticsRouter from "./routes/analytics.route";
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use("/api/v1", AdminRoute);
 app.use("/api/v1", courseRouter);
 app.use("/api/v1", orderRoute);
 app.use("/api/v1", notificationRoute);
+app.use("/api/v1", analyticsRouter)
 app.use((err: Error, req: Request, res: Response, next: () => void) => {
   console.error(err.stack);
   res.status(500).send("Something went wrong");

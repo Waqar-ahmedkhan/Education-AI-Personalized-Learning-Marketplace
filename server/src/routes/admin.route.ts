@@ -4,6 +4,7 @@ import {
   createAdmin,
   createInitialAdmin,
   deleteUser,
+  getAdminInfo,
   getallUsers,
   updateUserRoles,
 } from '../Controllers/user.controller';
@@ -20,5 +21,6 @@ AdminRoute.get('/admin/users', isAuthenticated, isAdmin, getallUsers);
 AdminRoute.put('/admin/update-user-role', isAuthenticated, isAdmin, updateUserRoles);
 AdminRoute.delete('/admin/user-delete/:id', isAuthenticated, isAdmin, deleteUser);
 AdminRoute.post('/admin/create-admin', isAuthenticated, isAdmin, createAdmin);
+AdminRoute.get('/admin/me', isAuthenticated, isAdmin, getAdminInfo);
 
 export default AdminRoute;

@@ -20,7 +20,6 @@ import * as crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-
 interface IRegistrationBody {
   name: string;
   email: string;
@@ -40,9 +39,6 @@ interface IActivationRequest {
   activation_token: string;
   activation_code: string;
 }
-
-
-
 
 export const createActivationToken = (
   user: IRegistrationBody
@@ -271,9 +267,6 @@ export const registerUser = CatchAsyncError(
   }
 );
 
-
-
-
 export const activateUser = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -496,32 +489,37 @@ export const UserLogin = CatchAsyncError(
 
       // Validate input
       if (!email || !password) {
-        return next(new AppError('Please enter both email and password', 400));
+        return next(new AppError("Please enter both email and password", 400));
       }
 
       // Find user and select password
-      const user = await UserModel.findOne({ email }).select('+password');
+      const user = await UserModel.findOne({ email }).select("+password");
       if (!user) {
-        return next(new AppError('Email not found', 401));
+        return next(new AppError("Email not found", 401));
       }
 
       // Check role
-      if (user.role !== 'user') {
-        return next(new AppError('This login is for users only. Please use the admin login.', 403));
+      if (user.role !== "user") {
+        return next(
+          new AppError(
+            "This login is for users only. Please use the admin login.",
+            403
+          )
+        );
       }
 
       // Compare password
       const isPasswordMatch = await user.comparePassword(password);
       if (!isPasswordMatch) {
-        return next(new AppError('Incorrect password', 401));
+        return next(new AppError("Incorrect password", 401));
       }
 
       // Send token only if all checks pass
       sendToken(user, 200, res);
     } catch (err: any) {
-      console.error('Error in user login:', err);
+      console.error("Error in user login:", err);
       // Ensure no response is sent before this point
-      return next(new AppError(err.message || 'Error during user login', 500));
+      return next(new AppError(err.message || "Error during user login", 500));
     }
   }
 );
@@ -530,17 +528,31 @@ export const UserLogin = CatchAsyncError(
 export const UserLogout = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      res.cookie("access_token", "", { maxAge: 1 });
-      res.cookie("refresh_token", "", { maxAge: 1 });
+      if (!req.user?._id) {
+        return next(new AppError("User not authenticated", 401));
+      }
 
-      // await client.del(req.user?.id);
-      const userId = String(req.user?._id);
+      res.cookie("access_token", "", {
+        maxAge: 1,
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        sameSite: "lax",
+      });
+      res.cookie("refresh_token", "", {
+        maxAge: 1,
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        sameSite: "lax",
+      });
+
+      const userId = String(req.user._id);
       try {
         await client.del(userId);
       } catch (err) {
-        res.status(400).json({
+        console.error(`Redis error during logout for user ${userId}:`, err);
+        return res.status(500).json({
           success: false,
-          message: "error in redis",
+          message: "Error clearing session in Redis",
         });
       }
 
@@ -548,16 +560,12 @@ export const UserLogout = CatchAsyncError(
         success: true,
         message: "Logged out successfully",
       });
-    } catch (err) {
-      res.status(400).json({
-        success: false,
-        message: "Error during logout",
-      });
+    } catch (err: any) {
+      console.error("Logout error:", err);
+      return next(new AppError("Error during logout", 500));
     }
   }
 );
-
-
 
 export const updateAccessToken = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -646,7 +654,42 @@ export const getUserInformatin = async (
   }
 };
 
+export const getAdminInfo = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = String(req.user?._id);
+      if (!userId) {
+        return next(new AppError("User ID not found in token", 401));
+      }
 
+      const user = await UserModel.findById(userId).select(
+        "-password -resetPasswordToken -resetPasswordExpires"
+      );
+
+      if (!user) {
+        return next(new AppError("User not found", 404));
+      }
+
+      if (user.role !== "admin") {
+        return next(new AppError("Access denied: Admin role required", 403));
+      }
+
+      res.status(200).json({
+        success: true,
+        user: {
+          _id: String(user._id), // safe and readable
+          name: user.name,
+          role: user.role,
+          email: user.email,
+          isVerified: user.isVerified,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error in getAdminInfo:", error);
+      return next(new AppError("Failed to fetch admin information", 500));
+    }
+  }
+);
 
 interface IGoogleAuth {
   token: string; // Google ID token
@@ -657,12 +700,10 @@ export const socialAuth = CatchAsyncError(
     try {
       const { token } = req.body as IGoogleAuth;
 
-      // Validate input
       if (!token) {
-        return next(new AppError("Google ID token is required", 400));
+        return next(new AppError('Google ID token is required', 400));
       }
 
-      // Verify Google ID token
       let ticket;
       try {
         ticket = await googleClient.verifyIdToken({
@@ -670,99 +711,55 @@ export const socialAuth = CatchAsyncError(
           audience: process.env.GOOGLE_CLIENT_ID,
         });
       } catch (error: any) {
-        console.error("Google token verification error:", error);
-        return next(new AppError("Invalid or expired Google ID token", 401));
+        console.error('Google token verification error:', error);
+        return next(new AppError('Invalid or expired Google ID token', 401));
       }
 
       const payload = ticket.getPayload();
       if (!payload) {
-        return next(new AppError("Invalid Google token payload", 401));
+        return next(new AppError('Invalid Google token payload', 401));
       }
 
       const { email, name, picture } = payload;
 
-      // Validate required fields
       if (!email || !name) {
-        return next(
-          new AppError("Email and name are required from Google profile", 400)
-        );
+        return next(new AppError('Email and name are required from Google profile', 400));
       }
 
-      // Normalize email
       const normalizedEmail = email.trim().toLowerCase();
 
-      // Check if user exists
       let user = await UserModel.findOne({ email: normalizedEmail });
 
       if (!user) {
-        // Create new user
         user = await UserModel.create({
           name: name.trim(),
           email: normalizedEmail,
           avatar: picture
             ? { public_id: `google_${payload.sub}`, url: picture }
             : undefined,
-          isVerified: true, // Google users are auto-verified
-          role: "user",
-          socialAuthProvider: "google", // Track Google auth
+          isVerified: true,
+          role: 'user', // Explicitly set to user
+          socialAuthProvider: 'google',
           courses: [],
           preferences: [],
           recommendedCourses: [],
           courseProgress: [],
           interactionHistory: [],
         });
-
         console.log(`New Google user created: ${normalizedEmail}`);
-      } else {
-        // Update avatar if provided and user doesn't have one
-        if (picture && !user.avatar?.public_id) {
-          user.avatar = {
-            public_id: `google_${payload.sub}`,
-            url: picture,
-          };
-          await user.save();
-        }
+      } else if (user.socialAuthProvider !== 'google') {
+        return next(new AppError('Account exists with different provider', 400));
       }
 
-      // Send tokens and cache user in Redis
-      await sendToken(user, 200, res);
+      // Use sendToken to set cookies and return response
+      return await sendToken(user, 200, res);
     } catch (err: any) {
-      console.error("Google social auth error:", err);
-      return next(
-        new AppError(
-          err.message || "Error during Google authentication",
-          500
-        )
-      );
+      console.error('Google social auth error:', err);
+      return next(new AppError(err.message || 'Error during Google authentication', 500));
     }
   }
 );
-// interface ISoicalAuth {
-//   name: string;
-//   email: string;
-//   avatar: string;
-// }
 
-// export const socialAuth = CatchAsyncError(
-//   async (req: Request, res: Response, next: NextFunction) => {
-//     try {
-//       const { email, name, avatar } = req.body as ISoicalAuth;
-//       if (!email || !name || !avatar) {
-//         return next(new AppError("Please provide all required fields", 400));
-//       }
-
-//       const user = await UserModel.create({ email, name, avatar });
-//       if (!user) {
-//         const newUser = await UserModel.create({ email, name, avatar });
-//         sendToken(newUser, 200, res);
-//       } else {
-//         sendToken(user, 200, res);
-//       }
-//     } catch (err) {
-//       console.log("error is not gooded");
-//     }
-//   }
-// );
 interface IUpdateUserInterface {
   name: string;
   email: string;
@@ -955,38 +952,48 @@ export const deleteUser = CatchAsyncError(
 export const adminLogin = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      console.log('Login attempt with body:', req.body);
+      console.log("Login attempt with body:", req.body);
       const { email, password } = req.body as loginType;
 
       if (!email || !password) {
-        console.log('Missing email or password');
-        return next(new AppError('Please enter both email and password', 400));
+        console.log("Missing email or password");
+        return next(new AppError("Please enter both email and password", 400));
       }
 
-      console.log('Querying user with email:', email);
-      const user = await UserModel.findOne({ email }).select('+password');
-      console.log('User found:', user ? { id: user._id, email: user.email, role: user.role } : null);
+      console.log("Querying user with email:", email);
+      const user = await UserModel.findOne({ email }).select("+password");
+      console.log(
+        "User found:",
+        user ? { id: user._id, email: user.email, role: user.role } : null
+      );
       if (!user) {
-        return next(new AppError('Incorrect email or password', 401));
+        return next(new AppError("Incorrect email or password", 401));
       }
 
-      if (user.role !== 'admin') {
-        console.log('Non-admin user attempted login:', user.role);
-        return next(new AppError('This login is for admins only. Please use the user login.', 403));
+      if (user.role !== "admin") {
+        console.log("Non-admin user attempted login:", user.role);
+        return next(
+          new AppError(
+            "This login is for admins only. Please use the user login.",
+            403
+          )
+        );
       }
 
-      console.log('Comparing password for user:', email);
+      console.log("Comparing password for user:", email);
       const isPasswordMatch = await user.comparePassword(password);
-      console.log('Password match result:', isPasswordMatch);
+      console.log("Password match result:", isPasswordMatch);
       if (!isPasswordMatch) {
-        return next(new AppError('Incorrect email or password', 401));
+        return next(new AppError("Incorrect email or password", 401));
       }
 
-      console.log('Calling sendToken for user:', user._id);
+      console.log("Calling sendToken for user:", user._id);
       sendToken(user, 200, res);
     } catch (err: any) {
-      console.error('Error in admin login:', err.message, err.stack);
-      return next(new AppError(`Error during admin login: ${err.message}`, 500));
+      console.error("Error in admin login:", err.message, err.stack);
+      return next(
+        new AppError(`Error during admin login: ${err.message}`, 500)
+      );
     }
   }
 );
@@ -1111,7 +1118,6 @@ export const createInitialAdmin = CatchAsyncError(
   }
 );
 
-
 export const forgetPassword = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -1155,7 +1161,9 @@ export const forgetPassword = CatchAsyncError(
       await user.save();
 
       // Construct reset URL
-      const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/reset-password?token=${resetToken}`;
+      const resetUrl = `${
+        process.env.FRONTEND_URL || "http://localhost:3000"
+      }/auth/reset-password?token=${resetToken}`;
 
       // Prepare email template
       const emailData = {
@@ -1285,5 +1293,3 @@ export const resetPassword = CatchAsyncError(
     }
   }
 );
-
-

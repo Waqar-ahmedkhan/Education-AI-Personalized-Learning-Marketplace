@@ -1,4 +1,11 @@
 "use strict";
+// import { Request, Response, NextFunction } from 'express';
+// import jwt, { JwtPayload } from 'jsonwebtoken';
+// import { AppError } from '../utils/AppError';
+// import { client } from '../utils/RedisConnect';
+// import UserModel from '../models/user.model';
+// import { CatchAsyncError } from './CatchAsyncError';
+// import { accessTokenOptions, refreshTokenOptions } from '../utils/jwt';
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -19,29 +26,37 @@ const RedisConnect_1 = require("../utils/RedisConnect");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const CatchAsyncError_1 = require("./CatchAsyncError");
 const jwt_1 = require("../utils/jwt");
+// Utility: Extract token from cookie or header
+const getTokenFromRequest = (req) => {
+    var _a, _b;
+    if ((_a = req.cookies) === null || _a === void 0 ? void 0 : _a.access_token)
+        return req.cookies.access_token;
+    if ((_b = req.headers.authorization) === null || _b === void 0 ? void 0 : _b.startsWith('Bearer')) {
+        return req.headers.authorization.split(' ')[1];
+    }
+    return null;
+};
 exports.isAuthenticated = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const access_token = req.cookies.access_token;
-    if (!access_token) {
+    const token = getTokenFromRequest(req);
+    if (!token) {
         return next(new AppError_1.AppError('Please login to access this resource', 401));
     }
     let decoded;
     try {
-        decoded = jsonwebtoken_1.default.verify(access_token, process.env.ACCESS_TOKEN_SECRET);
+        decoded = jsonwebtoken_1.default.verify(token, process.env.ACCESS_TOKEN_SECRET);
     }
     catch (err) {
-        if (err.name === 'TokenExpiredError') {
-            return next(new AppError_1.AppError('Access token expired. Please refresh or login again.', 401));
-        }
-        return next(new AppError_1.AppError('Invalid access token', 401));
+        return next(new AppError_1.AppError(err.name === 'TokenExpiredError'
+            ? 'Access token expired. Please refresh or login again.'
+            : 'Invalid access token', 401));
     }
     let user = yield RedisConnect_1.client.get(decoded.id);
     if (!user) {
         const dbUser = yield user_model_1.default.findById(decoded.id).select('name email role isVerified');
-        if (!dbUser) {
+        if (!dbUser)
             return next(new AppError_1.AppError('User not found', 401));
-        }
         user = JSON.stringify(dbUser);
-        yield RedisConnect_1.client.set(decoded.id, user, { EX: 7 * 24 * 60 * 60 }); // 7 days
+        yield RedisConnect_1.client.set(decoded.id, user, { EX: 7 * 24 * 60 * 60 });
     }
     req.user = JSON.parse(user);
     next();
@@ -61,35 +76,34 @@ exports.isAdmin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __a
     next();
 }));
 exports.refreshToken = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const refresh_token = req.cookies.refresh_token;
-    if (!refresh_token) {
+    const token = req.cookies.refresh_token;
+    if (!token)
         return next(new AppError_1.AppError('Please login again', 401));
-    }
     let decoded;
     try {
-        decoded = jsonwebtoken_1.default.verify(refresh_token, process.env.REFRESH_TOKEN_SECRET);
+        decoded = jsonwebtoken_1.default.verify(token, process.env.REFRESH_TOKEN_SECRET);
     }
     catch (err) {
-        if (err.name === 'TokenExpiredError') {
-            return next(new AppError_1.AppError('Refresh token expired. Please login again.', 401));
-        }
-        return next(new AppError_1.AppError('Invalid refresh token', 401));
+        return next(new AppError_1.AppError(err.name === 'TokenExpiredError'
+            ? 'Refresh token expired. Please login again.'
+            : 'Invalid refresh token', 401));
     }
     let user = yield RedisConnect_1.client.get(decoded.id);
     if (!user) {
         const dbUser = yield user_model_1.default.findById(decoded.id).select('name email role isVerified');
-        if (!dbUser) {
+        if (!dbUser)
             return next(new AppError_1.AppError('User not found', 401));
-        }
         user = JSON.stringify(dbUser);
-        yield RedisConnect_1.client.set(decoded.id, user, { EX: 7 * 24 * 60 * 60 }); // 7 days
+        yield RedisConnect_1.client.set(decoded.id, user, { EX: 7 * 24 * 60 * 60 });
     }
-    const newAccessToken = jsonwebtoken_1.default.sign({ id: decoded.id, role: JSON.parse(user).role }, // Include role in token
-    process.env.ACCESS_TOKEN_SECRET, { expiresIn: process.env.ACCESS_TOKEN_EXPIRE || '15m' });
-    // Update refresh token if needed (optional, based on your refresh strategy)
-    const newRefreshToken = jsonwebtoken_1.default.sign({ id: decoded.id, role: JSON.parse(user).role }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || '7d' });
+    const parsedUser = JSON.parse(user);
+    const newAccessToken = jsonwebtoken_1.default.sign({ id: decoded.id, role: parsedUser.role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' } // ⏱️ Access token now lasts 1 hour
+    );
+    const newRefreshToken = jsonwebtoken_1.default.sign({ id: decoded.id, role: parsedUser.role }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || '7d' });
     res.cookie('access_token', newAccessToken, jwt_1.accessTokenOptions);
     res.cookie('refresh_token', newRefreshToken, jwt_1.refreshTokenOptions);
-    yield RedisConnect_1.client.set(decoded.id, JSON.stringify(Object.assign(Object.assign({}, JSON.parse(user)), { refresh_token: newRefreshToken })), { EX: 7 * 24 * 60 * 60 });
+    yield RedisConnect_1.client.set(decoded.id, JSON.stringify(Object.assign(Object.assign({}, parsedUser), { refresh_token: newRefreshToken })), {
+        EX: 7 * 24 * 60 * 60,
+    });
     res.status(200).json({ success: true, accessToken: newAccessToken });
 }));

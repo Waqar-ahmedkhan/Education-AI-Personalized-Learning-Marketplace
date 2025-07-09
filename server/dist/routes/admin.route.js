@@ -15,4 +15,5 @@ AdminRoute.get('/admin/users', auth_1.isAuthenticated, auth_1.isAdmin, user_cont
 AdminRoute.put('/admin/update-user-role', auth_1.isAuthenticated, auth_1.isAdmin, user_controller_1.updateUserRoles);
 AdminRoute.delete('/admin/user-delete/:id', auth_1.isAuthenticated, auth_1.isAdmin, user_controller_1.deleteUser);
 AdminRoute.post('/admin/create-admin', auth_1.isAuthenticated, auth_1.isAdmin, user_controller_1.createAdmin);
+AdminRoute.get('/admin/me', auth_1.isAuthenticated, auth_1.isAdmin, user_controller_1.getAdminInfo);
 exports.default = AdminRoute;

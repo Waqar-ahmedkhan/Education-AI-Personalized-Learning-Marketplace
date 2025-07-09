@@ -83,6 +83,19 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// middleware.ts
 export const config = {
-  matcher: ['/admin-dashboard/:path*', '/user-dashboard/:path*', '/edit-profile', '/update-password', '/dashboard', '/auth/login', '/auth/admin-login', '/auth/callback', '/initial-admin'],
+  matcher: [
+    '/admin-dashboard/:path*',
+    '/user-dashboard/:path*',
+    '/edit-profile',
+    '/update-password',
+    '/dashboard',
+    '/orders', // Added for admin order page
+    '/notifications', // Added for admin notification page
+    '/auth/login',
+    '/auth/admin-login',
+    '/auth/callback',
+    '/initial-admin',
+  ],
 };

@@ -35,7 +35,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetPassword = exports.forgetPassword = exports.createInitialAdmin = exports.createAdmin = exports.adminLogin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.resetPassword = exports.forgetPassword = exports.createInitialAdmin = exports.createAdmin = exports.adminLogin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getAdminInfo = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -420,46 +420,59 @@ exports.UserLogin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => _
         const { email, password } = req.body;
         // Validate input
         if (!email || !password) {
-            return next(new AppError_1.AppError('Please enter both email and password', 400));
+            return next(new AppError_1.AppError("Please enter both email and password", 400));
         }
         // Find user and select password
-        const user = yield user_model_1.default.findOne({ email }).select('+password');
+        const user = yield user_model_1.default.findOne({ email }).select("+password");
         if (!user) {
-            return next(new AppError_1.AppError('Email not found', 401));
+            return next(new AppError_1.AppError("Email not found", 401));
         }
         // Check role
-        if (user.role !== 'user') {
-            return next(new AppError_1.AppError('This login is for users only. Please use the admin login.', 403));
+        if (user.role !== "user") {
+            return next(new AppError_1.AppError("This login is for users only. Please use the admin login.", 403));
         }
         // Compare password
         const isPasswordMatch = yield user.comparePassword(password);
         if (!isPasswordMatch) {
-            return next(new AppError_1.AppError('Incorrect password', 401));
+            return next(new AppError_1.AppError("Incorrect password", 401));
         }
         // Send token only if all checks pass
         (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (err) {
-        console.error('Error in user login:', err);
+        console.error("Error in user login:", err);
         // Ensure no response is sent before this point
-        return next(new AppError_1.AppError(err.message || 'Error during user login', 500));
+        return next(new AppError_1.AppError(err.message || "Error during user login", 500));
     }
 }));
 // User Logout Controller
 exports.UserLogout = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        res.cookie("access_token", "", { maxAge: 1 });
-        res.cookie("refresh_token", "", { maxAge: 1 });
-        // await client.del(req.user?.id);
-        const userId = String((_a = req.user) === null || _a === void 0 ? void 0 : _a._id);
+        if (!((_a = req.user) === null || _a === void 0 ? void 0 : _a._id)) {
+            return next(new AppError_1.AppError("User not authenticated", 401));
+        }
+        res.cookie("access_token", "", {
+            maxAge: 1,
+            secure: process.env.NODE_ENV === "production",
+            httpOnly: true,
+            sameSite: "lax",
+        });
+        res.cookie("refresh_token", "", {
+            maxAge: 1,
+            secure: process.env.NODE_ENV === "production",
+            httpOnly: true,
+            sameSite: "lax",
+        });
+        const userId = String(req.user._id);
         try {
             yield RedisConnect_1.client.del(userId);
         }
         catch (err) {
-            res.status(400).json({
+            console.error(`Redis error during logout for user ${userId}:`, err);
+            return res.status(500).json({
                 success: false,
-                message: "error in redis",
+                message: "Error clearing session in Redis",
             });
         }
         res.status(200).json({
@@ -468,10 +481,8 @@ exports.UserLogout = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
         });
     }
     catch (err) {
-        res.status(400).json({
-            success: false,
-            message: "Error during logout",
-        });
+        console.error("Logout error:", err);
+        return next(new AppError_1.AppError("Error during logout", 500));
     }
 }));
 exports.updateAccessToken = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -536,15 +547,42 @@ const getUserInformatin = (req, res, next) => __awaiter(void 0, void 0, void 0, 
     }
 });
 exports.getUserInformatin = getUserInformatin;
-exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+exports.getAdminInfo = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { token } = req.body;
-        // Validate input
-        if (!token) {
-            return next(new AppError_1.AppError("Google ID token is required", 400));
+        const userId = String((_a = req.user) === null || _a === void 0 ? void 0 : _a._id);
+        if (!userId) {
+            return next(new AppError_1.AppError("User ID not found in token", 401));
         }
-        // Verify Google ID token
+        const user = yield user_model_1.default.findById(userId).select("-password -resetPasswordToken -resetPasswordExpires");
+        if (!user) {
+            return next(new AppError_1.AppError("User not found", 404));
+        }
+        if (user.role !== "admin") {
+            return next(new AppError_1.AppError("Access denied: Admin role required", 403));
+        }
+        res.status(200).json({
+            success: true,
+            user: {
+                _id: String(user._id), // safe and readable
+                name: user.name,
+                role: user.role,
+                email: user.email,
+                isVerified: user.isVerified,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Error in getAdminInfo:", error);
+        return next(new AppError_1.AppError("Failed to fetch admin information", 500));
+    }
+}));
+exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            return next(new AppError_1.AppError('Google ID token is required', 400));
+        }
         let ticket;
         try {
             ticket = yield googleClient.verifyIdToken({
@@ -553,33 +591,29 @@ exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
             });
         }
         catch (error) {
-            console.error("Google token verification error:", error);
-            return next(new AppError_1.AppError("Invalid or expired Google ID token", 401));
+            console.error('Google token verification error:', error);
+            return next(new AppError_1.AppError('Invalid or expired Google ID token', 401));
         }
         const payload = ticket.getPayload();
         if (!payload) {
-            return next(new AppError_1.AppError("Invalid Google token payload", 401));
+            return next(new AppError_1.AppError('Invalid Google token payload', 401));
         }
         const { email, name, picture } = payload;
-        // Validate required fields
         if (!email || !name) {
-            return next(new AppError_1.AppError("Email and name are required from Google profile", 400));
+            return next(new AppError_1.AppError('Email and name are required from Google profile', 400));
         }
-        // Normalize email
         const normalizedEmail = email.trim().toLowerCase();
-        // Check if user exists
         let user = yield user_model_1.default.findOne({ email: normalizedEmail });
         if (!user) {
-            // Create new user
             user = yield user_model_1.default.create({
                 name: name.trim(),
                 email: normalizedEmail,
                 avatar: picture
                     ? { public_id: `google_${payload.sub}`, url: picture }
                     : undefined,
-                isVerified: true, // Google users are auto-verified
-                role: "user",
-                socialAuthProvider: "google", // Track Google auth
+                isVerified: true,
+                role: 'user', // Explicitly set to user
+                socialAuthProvider: 'google',
                 courses: [],
                 preferences: [],
                 recommendedCourses: [],
@@ -588,22 +622,15 @@ exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
             });
             console.log(`New Google user created: ${normalizedEmail}`);
         }
-        else {
-            // Update avatar if provided and user doesn't have one
-            if (picture && !((_a = user.avatar) === null || _a === void 0 ? void 0 : _a.public_id)) {
-                user.avatar = {
-                    public_id: `google_${payload.sub}`,
-                    url: picture,
-                };
-                yield user.save();
-            }
+        else if (user.socialAuthProvider !== 'google') {
+            return next(new AppError_1.AppError('Account exists with different provider', 400));
         }
-        // Send tokens and cache user in Redis
-        yield (0, jwt_1.sendToken)(user, 200, res);
+        // Use sendToken to set cookies and return response
+        return yield (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (err) {
-        console.error("Google social auth error:", err);
-        return next(new AppError_1.AppError(err.message || "Error during Google authentication", 500));
+        console.error('Google social auth error:', err);
+        return next(new AppError_1.AppError(err.message || 'Error during Google authentication', 500));
     }
 }));
 exports.UpdateUserInformation = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -746,33 +773,33 @@ exports.deleteUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
 }));
 exports.adminLogin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log('Login attempt with body:', req.body);
+        console.log("Login attempt with body:", req.body);
         const { email, password } = req.body;
         if (!email || !password) {
-            console.log('Missing email or password');
-            return next(new AppError_1.AppError('Please enter both email and password', 400));
+            console.log("Missing email or password");
+            return next(new AppError_1.AppError("Please enter both email and password", 400));
         }
-        console.log('Querying user with email:', email);
-        const user = yield user_model_1.default.findOne({ email }).select('+password');
-        console.log('User found:', user ? { id: user._id, email: user.email, role: user.role } : null);
+        console.log("Querying user with email:", email);
+        const user = yield user_model_1.default.findOne({ email }).select("+password");
+        console.log("User found:", user ? { id: user._id, email: user.email, role: user.role } : null);
         if (!user) {
-            return next(new AppError_1.AppError('Incorrect email or password', 401));
+            return next(new AppError_1.AppError("Incorrect email or password", 401));
         }
-        if (user.role !== 'admin') {
-            console.log('Non-admin user attempted login:', user.role);
-            return next(new AppError_1.AppError('This login is for admins only. Please use the user login.', 403));
+        if (user.role !== "admin") {
+            console.log("Non-admin user attempted login:", user.role);
+            return next(new AppError_1.AppError("This login is for admins only. Please use the user login.", 403));
         }
-        console.log('Comparing password for user:', email);
+        console.log("Comparing password for user:", email);
         const isPasswordMatch = yield user.comparePassword(password);
-        console.log('Password match result:', isPasswordMatch);
+        console.log("Password match result:", isPasswordMatch);
         if (!isPasswordMatch) {
-            return next(new AppError_1.AppError('Incorrect email or password', 401));
+            return next(new AppError_1.AppError("Incorrect email or password", 401));
         }
-        console.log('Calling sendToken for user:', user._id);
+        console.log("Calling sendToken for user:", user._id);
         (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (err) {
-        console.error('Error in admin login:', err.message, err.stack);
+        console.error("Error in admin login:", err.message, err.stack);
         return next(new AppError_1.AppError(`Error during admin login: ${err.message}`, 500));
     }
 }));

@@ -1,4 +1,5 @@
-"use client";
+'use client';
+
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -50,9 +51,9 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      console.log('Attempting login with email:', email);
-      await login(email, password);
-      console.log('Login successful, should redirect to /admin-dashboard');
+      console.log('Attempting admin login with email:', email);
+      await login(email, password, true); // Pass isAdmin: true
+      console.log('Login successful, redirecting to /admin-dashboard');
     } catch (error: unknown) {
       const axiosError = error as { message?: string; response?: { status?: number; data?: unknown } };
       console.error('Login error in AdminLoginPage:', {

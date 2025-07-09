@@ -35,3 +35,16 @@ export interface CustomAxiosError<T = unknown> {
   };
   config?: Record<string, unknown>;
 }
+
+// ✅ Add these
+export interface AnalyticsData {
+  labels: string[];
+  data: number[];
+}
+
+export interface AuthContextType {
+  token: string | null;
+  userRole: 'user' | 'admin' | null;
+  userName: string | null;
+  isLoading: boolean;
+}

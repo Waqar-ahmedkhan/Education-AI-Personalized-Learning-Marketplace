@@ -10,7 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { XCircle } from 'lucide-react';
+import Cookies from 'js-cookie';
+
 
 interface FormData {
   currentPassword: string;
@@ -25,27 +28,30 @@ export default function UpdatePassword() {
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
 
+
   useEffect(() => {
     setMounted(true);
-    if (!isAuthenticated && !isLoading) {
-      router.push('/auth/login');
+    if (!isLoading && !isAuthenticated) {
+      console.log('UpdatePassword: Not authenticated, redirecting to /auth/login');
+      router.push('/auth/login?error=Please+log+in');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isLoading, isAuthenticated, router]);
 
   const onSubmit = async (data: FormData) => {
     try {
-      const res = await fetch('http://localhost:8080/api/v1/user/update-password', {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const res = await fetch(`${baseUrl}/api/v1/user/update-password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+          Authorization: `Bearer ${localStorage.getItem('access_token') || Cookies.get('access_token')}`,
         },
         credentials: 'include',
         body: JSON.stringify(data),
       });
       const result = await res.json();
       if (result.success) {
-        router.push('/profiles');
+        router.push('/profiles?success=Password+updated+successfully');
       } else {
         setError(result.message || 'Failed to update password');
       }
@@ -71,10 +77,10 @@ export default function UpdatePassword() {
 
   return (
     <div
-      className={`min-h-screen p-6 bg-gradient-to-br ${isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'}`}
+      className={`min-h-screen p-4 sm:p-6 bg-gradient-to-br ${isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'} flex items-center justify-center`}
     >
       <motion.div
-        className="container mx-auto max-w-md"
+        className="w-full max-w-md"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -87,15 +93,15 @@ export default function UpdatePassword() {
           </CardHeader>
           <CardContent>
             {error && (
-              <div className={`mb-4 p-4 rounded-lg border ${isDark ? 'bg-red-900/20 border-red-500 text-red-400' : 'bg-red-50 border-red-200 text-red-600'}`}>
-                <p className="text-sm flex items-center">
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription className="flex items-center">
                   <XCircle className="w-4 h-4 mr-2" />
                   {error}
-                </p>
-              </div>
+                </AlertDescription>
+              </Alert>
             )}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="currentPassword" className="text-gray-700 dark:text-gray-300">Current Password</Label>
                 <Input
                   id="currentPassword"
@@ -103,9 +109,9 @@ export default function UpdatePassword() {
                   {...register('currentPassword', { required: 'Current password is required' })}
                   className={isDark ? 'bg-gray-700 text-gray-200' : 'bg-white text-gray-800'}
                 />
-                {errors.currentPassword && <p className="text-red-500 text-sm mt-1">{errors.currentPassword.message}</p>}
+                {errors.currentPassword && <p className="text-red-500 text-sm">{errors.currentPassword.message}</p>}
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="newPassword" className="text-gray-700 dark:text-gray-300">New Password</Label>
                 <Input
                   id="newPassword"
@@ -120,9 +126,9 @@ export default function UpdatePassword() {
                   })}
                   className={isDark ? 'bg-gray-700 text-gray-200' : 'bg-white text-gray-800'}
                 />
-                {errors.newPassword && <p className="text-red-500 text-sm mt-1">{errors.newPassword.message}</p>}
+                {errors.newPassword && <p className="text-red-500 text-sm">{errors.newPassword.message}</p>}
               </div>
-              <Button type="submit" className={`${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'} text-white`}>
+              <Button type="submit" className={`w-full ${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'} text-white`}>
                 Update Password
               </Button>
             </form>

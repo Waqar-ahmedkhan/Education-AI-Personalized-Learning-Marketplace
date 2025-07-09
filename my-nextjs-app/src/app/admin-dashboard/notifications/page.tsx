@@ -1,16 +1,40 @@
+// pages/notifications.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sun, Moon } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 import NotificationList from '@/components/dashboard/NotificationList';
 
 const NotificationsPage: React.FC = () => {
+  const { isAdmin, isLoading, isTokenExpired } = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const router = useRouter();
+
+  // Redirect non-admins or unauthenticated users
+  useEffect(() => {
+    if (!isLoading && (!isAdmin || isTokenExpired)) {
+      router.push('/auth/login?error=Admin+access+required');
+    }
+  }, [isAdmin, isLoading, isTokenExpired, router]);
 
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"
+        ></motion.div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -24,7 +48,9 @@ const NotificationsPage: React.FC = () => {
           <motion.h2
             initial={{ y: -20 }}
             animate={{ y: 0 }}
-            className="text-3xl font-bold tracking-tight sm:text-4xl"
+            className={`text-3xl font-bold tracking-tight sm:text-4xl ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
           >
             Notification Management
           </motion.h2>

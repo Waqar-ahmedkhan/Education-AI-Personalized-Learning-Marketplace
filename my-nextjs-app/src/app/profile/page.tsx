@@ -1,232 +1,186 @@
-
-// 'use client';
-
-// import { useAuth } from '@/lib/auth';
-// import { useEffect, useState } from 'react';
-// import { useTheme } from 'next-themes';
-// import { motion } from 'framer-motion';
-// import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// import { Button } from '@/components/ui/button';
-// import { User, Mail, Shield, CheckCircle, XCircle, Edit, LogOut } from 'lucide-react';
-// import Link from 'next/link';
-
-// export default function Profile() {
-//   const { userRole, userName, isLoading, logout } = useAuth();
-//   const { theme, systemTheme } = useTheme();
-//   const [mounted, setMounted] = useState(false);
-//   const [userData, setUserData] = useState<{ email: string; isVerified: boolean } | null>(null);
-//   const [error, setError] = useState<string | null>(null);
-
-//   useEffect(() => {
-//     setMounted(true);
-//     if (userRole && !isLoading) {
-//       const fetchProfile = async () => {
-//         try {
-//           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/me`, {
-//             method: 'GET',
-//             headers: {
-//               'Content-Type': 'application/json',
-//             },
-//             credentials: 'include', // Send HTTP-only cookies
-//           });
-//           if (!res.ok) {
-//             const errorData = await res.json();
-//             throw new Error(errorData.message || `HTTP error ${res.status}`);
-//           }
-//           const data = await res.json();
-//           if (data.success) {
-//             setUserData({ email: data.user.email, isVerified: data.user.isVerified });
-//           } else {
-//             setError(data.message || 'Failed to fetch profile data');
-//           }
-//         } catch (err: unknown) {
-//           setError(err.message || 'Failed to connect to the server');
-//           console.error('Profile fetch error:', err);
-//         }
-//       };
-//       fetchProfile();
-//     }
-//   }, [userRole, isLoading]);
-
-//   const isDark = theme === 'system' ? systemTheme === 'dark' : theme === 'dark';
-
-//   const containerVariants = {
-//     hidden: { opacity: 0, y: 20 },
-//     visible: { opacity: 1, y: 0, transition: { duration: 0.5, staggerChildren: 0.1 } },
-//   };
-
-//   const itemVariants = {
-//     hidden: { opacity: 0, y: 10 },
-//     visible: { opacity: 1, y: 0 },
-//   };
-
-//   if (!mounted || isLoading) {
-//     return (
-//       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-indigo-900">
-//         <motion.div
-//           animate={{ rotate: 360 }}
-//           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-//           className="h-12 w-12 border-4 border-indigo-400 border-t-transparent rounded-full"
-//         />
-//       </div>
-//     );
-//   }
-
-//   if (!userRole) {
-//     return (
-//       <div className={`min-h-screen p-6 bg-gradient-to-br ${isDark ? 'from-gray-900 to-indigo-900' : 'from-gray-100 to-indigo-200'}`}>
-//         <motion.div
-//           className="text-center text-red-600 dark:text-red-400"
-//           initial={{ opacity: 0 }}
-//           animate={{ opacity: 1 }}
-//         >
-//           Please log in to view your profile.
-//         </motion.div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div
-//       className={`min-h-screen p-6 bg-gradient-to-br ${isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'}`}
-//     >
-//       <motion.div
-//         className="container mx-auto max-w-2xl"
-//         variants={containerVariants}
-//         initial="hidden"
-//         animate="visible"
-//       >
-//         <h1 className="text-4xl font-extrabold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-primary-light to-secondary-light dark:from-primary-dark dark:to-secondary-dark">
-//           Your Profile
-//         </h1>
-
-//         {error && (
-//           <motion.div
-//             className={`mb-6 p-4 rounded-lg border ${isDark ? 'bg-red-900/20 border-red-500 text-red-400' : 'bg-red-50 border-red-200 text-red-600'}`}
-//             initial={{ opacity: 0, y: -10 }}
-//             animate={{ opacity: 1, y: 0 }}
-//             aria-live="polite"
-//           >
-//             <div className="flex items-center justify-between">
-//               <p className="text-sm flex items-center">
-//                 <XCircle className="w-4 h-4 mr-2" />
-//                 {error}
-//               </p>
-//               <button
-//                 onClick={() => setError(null)}
-//                 className={`text-sm ${isDark ? 'hover:text-red-300' : 'hover:text-red-700'}`}
-//                 aria-label="Dismiss error"
-//               >
-//                 ×
-//               </button>
-//             </div>
-//           </motion.div>
-//         )}
-
-//         <Card className={`backdrop-blur-lg ${isDark ? 'bg-gray-800/70 border-gray-700/50' : 'bg-white/70 border-gray-200/50'} shadow-xl`}>
-//           <CardHeader className="flex items-center justify-between">
-//             <CardTitle className="text-2xl font-semibold text-text-light dark:text-text-dark">
-//               Profile Details
-//             </CardTitle>
-//             <Link href="/profile/edit-profile">
-//               <Button
-//                 variant="outline"
-//                 size="sm"
-//                 className={`${isDark ? 'text-primary-dark border-primary-dark hover:bg-primary-dark' : 'text-primary-light border-primary-light hover:bg-primary-light'} hover:text-white`}
-//               >
-//                 <Edit size={16} className="mr-2" />
-//                 Edit Profile
-//               </Button>
-//             </Link>
-//           </CardHeader>
-//           <CardContent className="space-y-6">
-//             <motion.div className="flex items-center gap-4" variants={itemVariants}>
-//               <User className={`w-6 h-6 ${isDark ? 'text-primary-dark' : 'text-primary-light'}`} />
-//               <div>
-//                 <p className="text-sm text-gray-500 dark:text-gray-400">Name</p>
-//                 <p className="text-lg font-medium text-text-light dark:text-text-dark">{userName || 'User'}</p>
-//               </div>
-//             </motion.div>
-//             <motion.div className="flex items-center gap-4" variants={itemVariants}>
-//               <Mail className={`w-6 h-6 ${isDark ? 'text-primary-dark' : 'text-primary-light'}`} />
-//               <div>
-//                 <p className="text-sm text-gray-500 dark:text-gray-400">Email</p>
-//                 <p className="text-lg font-medium text-text-light dark:text-text-dark">{userData?.email || 'Not available'}</p>
-//               </div>
-//             </motion.div>
-//             <motion.div className="flex items-center gap-4" variants={itemVariants}>
-//               <Shield className={`w-6 h-6 ${isDark ? 'text-primary-dark' : 'text-primary-light'}`} />
-//               <div>
-//                 <p className="text-sm text-gray-500 dark:text-gray-400">Role</p>
-//                 <p className="text-lg font-medium text-text-light dark:text-text-dark">{userRole}</p>
-//               </div>
-//             </motion.div>
-//             <motion.div className="flex items-center gap-4" variants={itemVariants}>
-//               <CheckCircle className={`w-6 h-6 ${userData?.isVerified ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`} />
-//               <div>
-//                 <p className="text-sm text-gray-500 dark:text-gray-400">Verified</p>
-//                 <p className="text-lg font-medium text-text-light dark:text-text-dark">{userData?.isVerified ? 'Yes' : 'No'}</p>
-//               </div>
-//             </motion.div>
-//           </CardContent>
-//         </Card>
-
-//         <motion.div className="mt-6 flex justify-end" variants={itemVariants}>
-//           <Button
-//             variant="outline"
-//             className={`${isDark ? 'text-gray-300 border-gray-600 hover:bg-gray-700' : 'text-gray-600 border-gray-300 hover:bg-gray-200'}`}
-//             onClick={logout}
-//           >
-//             <LogOut className="w-4 h-4 mr-2" />
-//             Logout
-//           </Button>
-//         </motion.div>
-//       </motion.div>
-//     </div>
-//   );
-// }
-
 'use client';
 
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState } from 'react';
-import Cookies from 'js-cookie'; // ✅ Correct import
+import Cookies from 'js-cookie';
+import { LogOut } from 'lucide-react';
+import Image from 'next/image';
+
+interface UserData {
+  email: string;
+  isVerified: boolean;
+  avatar?: { public_id: string; url: string };
+}
 
 export default function Profile() {
-  const { userRole, userName } = useAuth();
-  const [userData, setUserData] = useState<{ email: string; isVerified: boolean } | null>(null);
+  const { userRole, userName, userAvatar, isLoading, logout } = useAuth();
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (userRole) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/me`, {
+    console.log('Profile: useEffect triggered, userRole:', userRole, 'isLoading:', isLoading);
+    if (userRole && !isLoading) {
+      const endpoint = userRole === 'admin' ? '/api/v1/admin/me' : '/api/v1/user/me';
+      const token = Cookies.get('access_token');
+      console.log('Profile: Fetching', endpoint, 'with token:', token ? 'present' : 'missing');
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
         headers: {
-          Authorization: `Bearer ${Cookies.get('access_token')}`,
+          Authorization: `Bearer ${token || ''}`,
+          'Content-Type': 'application/json',
         },
         credentials: 'include',
       })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) {
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`HTTP error ${res.status}`);
+          }
+          return res.json();
+        })
+        .then((data: { success: boolean; user?: UserData; message?: string }) => {
+          console.log('Profile API response:', JSON.stringify(data, null, 2));
+          if (data.success && data.user) {
             setUserData({
               email: data.user.email,
               isVerified: data.user.isVerified,
+              avatar: data.user.avatar,
             });
+            setError(null);
+          } else {
+            console.error('Profile: Failed to fetch user data:', data.message);
+            setUserData(null);
+            setError(data.message || 'Failed to load profile data');
           }
+        })
+        .catch((error: Error) => {
+          console.error('Profile: Error fetching user data:', error.message);
+          setUserData(null);
+          setError('Error loading profile data');
         });
     }
-  }, [userRole]);
+  }, [userRole, isLoading]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-700">
+        <svg
+          className="animate-spin h-8 w-8 text-indigo-500"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v8H4z"
+          ></path>
+        </svg>
+      </div>
+    );
+  }
 
   if (!userRole) {
-    return <div>Please log in to view your profile.</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-700">
+        <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+          <p className="text-lg text-gray-700">Please log in to view your profile.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <h1 className="text-2xl font-bold">Profile</h1>
-      <p>Name: {userName || 'User'}</p>
-      <p>Email: {userData?.email || 'Loading...'}</p>
-      <p>Role: {userRole}</p>
-      <p>Verified: {userData?.isVerified ? 'Yes' : 'No'}</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-2xl p-8 transform transition-all hover:scale-105">
+        <div className="flex flex-col items-center">
+          {userAvatar ? (
+            <Image
+              src={userAvatar.url}
+              alt="Profile Avatar"
+              className="w-24 h-24 rounded-full mb-4"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center justify-center text-white text-2xl font-bold mb-4">
+              {userName ? userName.charAt(0).toUpperCase() : 'U'}
+            </div>
+          )}
+          <h1 className="text-3xl font-extrabold text-gray-800 mb-6">Profile</h1>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg w-full text-center">
+              {error}
+            </div>
+          )}
+
+          {!userData && !error && (
+            <div className="flex items-center justify-center mb-4">
+              <svg
+                className="animate-spin h-8 w-8 text-indigo-500"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8H4z"
+                ></path>
+              </svg>
+            </div>
+          )}
+
+          {userData && (
+            <div className="w-full space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600 font-medium">Name:</span>
+                <span className="text-gray-800 font-semibold">
+                  {userName || 'Unknown User'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600 font-medium">Email:</span>
+                <span className="text-gray-800 font-semibold">{userData.email}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600 font-medium">Role:</span>
+                <span className="text-gray-800 font-semibold capitalize">{userRole}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-gray-600 font-medium">Verified:</span>
+                <span
+                  className={`font-semibold ${
+                    userData.isVerified ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
+                  {userData.isVerified ? 'Yes' : 'No'}
+                </span>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={logout}
+            className="mt-6 flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

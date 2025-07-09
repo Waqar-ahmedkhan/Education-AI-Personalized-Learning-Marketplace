@@ -30,7 +30,7 @@ interface FormErrors {
 }
 
 // Constants
-const API_ENDPOINT = 'http://localhost:8080/api/v1/active-user'
+const API_ENDPOINT = 'http://localhost:8080/api/v1/user/activate'
 const RESEND_COOLDOWN = 30
 const AUTO_SUBMIT_DELAY = 300
 const REQUEST_TIMEOUT = 10000

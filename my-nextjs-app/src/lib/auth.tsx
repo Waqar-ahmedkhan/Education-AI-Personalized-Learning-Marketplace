@@ -4,14 +4,42 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import axios from 'axios';
-import { LoginResponse, CustomAxiosError } from '@/types';
+
+interface User {
+  _id: string;
+  name: string;
+  role: string;
+  email: string;
+  isVerified: boolean;
+  avatar?: {
+    public_id: string;
+    url: string;
+  };
+}
+
+interface LoginResponse {
+  success: boolean;
+  accessToken?: string;
+  user: User;
+  message?: string;
+}
+
+interface CustomAxiosError<T = unknown> extends Error {
+  response?: {
+    status: number;
+    data: T;
+  };
+  message: string;
+}
 
 interface AuthContextType {
   token: string | null;
   userRole: string | null;
   userName: string | null;
+  userAvatar: { public_id: string; url: string } | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  isTokenExpired: boolean;
+  login: (email: string, password: string, isAdmin?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
 }
@@ -22,59 +50,121 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(Cookies.get('access_token') || null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(!!token); // Start loading if token exists
+  const [userAvatar, setUserAvatar] = useState<{ public_id: string; url: string } | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(!!token);
+  const [isTokenExpired, setIsTokenExpired] = useState<boolean>(false);
   const router = useRouter();
 
   useEffect(() => {
+    console.log('AuthProvider: Initializing with token:', token ? 'present' : 'missing');
     const storedData = sessionStorage.getItem('userData');
     if (storedData) {
-      const { role, name } = JSON.parse(storedData);
+      const { role, name, avatar } = JSON.parse(storedData);
+      console.log('AuthProvider: Restored from sessionStorage:', { role, name, avatar });
       setUserRole(role);
       setUserName(name);
+      setUserAvatar(avatar || null);
       setIsLoading(false);
     }
     if (token && !userRole) {
+      console.log('AuthProvider: Fetching user data');
       fetchUserData();
+    }
+  }, [token]);
+
+  const checkTokenExpiration = async () => {
+    if (!token) {
+      setIsTokenExpired(true);
+      return;
+    }
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      await axios.get(`${baseUrl}/api/v1/validate-token`, {
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
+      });
+      setIsTokenExpired(false);
+    } catch (error) {
+      const axiosError = error as CustomAxiosError;
+      console.error('AuthProvider: Token validation error:', {
+        status: axiosError.response?.status,
+        message: axiosError.message,
+      });
+      if (axiosError.response?.status === 401) {
+        setIsTokenExpired(true);
+        logout();
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      checkTokenExpiration();
+      const interval = setInterval(checkTokenExpiration, 5 * 60 * 1000); // Check every 5 minutes
+      return () => clearInterval(interval);
     }
   }, [token]);
 
   const fetchUserData = async () => {
     setIsLoading(true);
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const res = await axios.get<{ success: boolean; user: { _id: string; name: string; role: string; email: string; isVerified: boolean } }>(
-        `${baseUrl}/api/v1/me`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const endpoints = ['/api/v1/admin/me', '/api/v1/user/me'];
+
+    for (const endpoint of endpoints) {
+      console.log(`AuthProvider: Attempting to fetch ${endpoint}`);
+      try {
+        const res = await axios.get<{ success: boolean; user: User }>(
+          `${baseUrl}${endpoint}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true,
+          }
+        );
+        console.log(`AuthProvider: ${endpoint} response:`, {
+          status: res.status,
+          success: res.data.success,
+          user: res.data.user,
+        });
+        if (res.data.success) {
+          setUserRole(res.data.user.role);
+          setUserName(res.data.user.name);
+          setUserAvatar(res.data.user.avatar || null);
+          sessionStorage.setItem(
+            'userData',
+            JSON.stringify({
+              role: res.data.user.role,
+              name: res.data.user.name,
+              avatar: res.data.user.avatar,
+            })
+          );
+          return;
         }
-      );
-      if (res.data.success) {
-        setUserRole(res.data.user.role);
-        setUserName(res.data.user.name);
-        sessionStorage.setItem('userData', JSON.stringify({ role: res.data.user.role, name: res.data.user.name }));
-      } else {
-        logout();
+      } catch (error) {
+        const axiosError = error as CustomAxiosError<{ message?: string }>;
+        console.error(`AuthProvider: Error fetching ${endpoint}:`, {
+          status: axiosError.response?.status,
+          data: axiosError.response?.data,
+          message: axiosError.message,
+        });
+        if (axiosError.response?.status === 404 || axiosError.response?.status === 403) {
+          continue;
+        }
+        break;
       }
-    } catch (error) {
-      const axiosError = error as CustomAxiosError<{ message?: string }>;
-      console.error('Failed to fetch user data:', {
-        status: axiosError.response?.status,
-        data: axiosError.response?.data,
-        message: axiosError.message,
-      });
-      logout();
-    } finally {
-      setIsLoading(false);
     }
+    console.log('AuthProvider: All endpoints failed, logging out');
+    logout();
+    setIsLoading(false);
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, isAdmin: boolean = false) => {
     setIsLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const endpoint = isAdmin ? '/api/v1/admin/login' : '/api/v1/login';
+      console.log(`AuthProvider: Logging in via ${endpoint} with email: ${email}`);
       const res = await axios.post<LoginResponse>(
-        `${baseUrl}/api/v1/admin/login`,
+        `${baseUrl}${endpoint}`,
         { email, password },
         {
           withCredentials: true,
@@ -84,6 +174,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         }
       );
+
+      console.log('AuthProvider: Login response:', res.data);
 
       if (!res.data.success || !res.data.accessToken) {
         throw new Error(res.data.message || 'Login failed');
@@ -99,7 +191,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(res.data.accessToken);
       setUserRole(res.data.user.role);
       setUserName(res.data.user.name);
-      sessionStorage.setItem('userData', JSON.stringify({ role: res.data.user.role, name: res.data.user.name }));
+      setUserAvatar(res.data.user.avatar || null);
+      setIsTokenExpired(false);
+      sessionStorage.setItem(
+        'userData',
+        JSON.stringify({
+          role: res.data.user.role,
+          name: res.data.user.name,
+          avatar: res.data.user.avatar,
+        })
+      );
+      console.log(`AuthProvider: Login successful, redirecting to ${res.data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard'}`);
       router.push(res.data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard');
     } catch (error) {
       const axiosError = error as CustomAxiosError<{ message?: string }>;
@@ -109,7 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         axiosError.message ||
         'An unexpected error occurred';
 
-      console.error('Login error:', { status, data: axiosError.response?.data, message });
+      console.error('AuthProvider: Login error:', { status, data: axiosError.response?.data, message });
 
       if (status === 404) throw new Error('API endpoint not found');
       if (status === 401) throw new Error('Invalid email or password');
@@ -125,25 +227,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      await axios.get(`${baseUrl}/api/v1/logout-user`, {
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true,
-      });
+      console.log('AuthProvider: Logging out, token:', token ? 'present' : 'null');
+      if (token) {
+        await axios.get(`${baseUrl}/api/v1/logout`, {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        });
+        console.log('AuthProvider: Logout API call successful');
+      } else {
+        console.log('AuthProvider: No token, skipping logout API call');
+      }
     } catch (error) {
-      console.error('Logout error:', error);
+      const axiosError = error as CustomAxiosError<{ message: string }>;
+      console.error('AuthProvider: Logout error:', {
+        status: axiosError.response?.status,
+        data: axiosError.response?.data,
+        message: axiosError.message,
+      });
     } finally {
       Cookies.remove('access_token');
       setToken(null);
       setUserRole(null);
       setUserName(null);
+      setUserAvatar(null);
+      setIsTokenExpired(true);
       sessionStorage.clear();
+      console.log('AuthProvider: Logout complete, redirecting to /auth/login');
       router.push('/auth/login');
       setIsLoading(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ token, userRole, userName, isLoading, login, logout, isAdmin: userRole === 'admin' }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        userRole,
+        userName,
+        userAvatar,
+        isLoading,
+        isTokenExpired,
+        login,
+        logout,
+        isAdmin: userRole === 'admin',
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -212,7 +212,10 @@ const courseSchema = new mongoose_1.Schema({
     description: { type: String, required: true },
     price: { type: Number, required: true },
     estimatedPrice: { type: Number },
-    thumbnail: { type: String },
+    thumbnail: {
+        public_id: { type: String, required: true },
+        url: { type: String, required: true },
+    },
     tags: [{ type: String }],
     level: { type: String, required: true },
     demoUrl: { type: String },
@@ -257,9 +260,10 @@ courseSchema.methods.updatePopularity = function () {
     // Recency score (higher for newer courses)
     const ageInDays = (Date.now() - this.createdAt.getTime()) / (1000 * 60 * 60 * 24);
     const recencyScore = Math.max(100 - ageInDays, 0);
-    this.popularity = (reviewScore * reviewWeight) +
-        (purchaseScore * purchaseWeight) +
-        (recencyScore * recencyWeight);
+    this.popularity =
+        reviewScore * reviewWeight +
+            purchaseScore * purchaseWeight +
+            recencyScore * recencyWeight;
     return this.save();
 };
 const CourseModel = mongoose_1.default.model("Course", courseSchema);

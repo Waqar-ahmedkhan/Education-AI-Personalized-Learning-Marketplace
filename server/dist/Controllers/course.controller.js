@@ -30,22 +30,44 @@ const Notification_model_1 = require("../models/Notification.model");
 const user_services_1 = require("../services/user.services");
 exports.uploadCourse = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        console.log("Received course data:", JSON.stringify(req.body, null, 2));
         const data = req.body;
-        const Thumbnail = data.thumbnail;
-        if (Thumbnail) {
-            const myCloud = yield cloudinary_1.default.v2.uploader.upload(Thumbnail, {
-                folder: "courses",
-            });
-            data.thumbnail = {
-                public_id: myCloud.public_id,
-                url: myCloud.secure_url,
-            };
+        // Validate that req.body is not empty
+        if (!data || Object.keys(data).length === 0) {
+            return next(new AppError_1.AppError("No course data provided in request body", 400));
         }
-        (0, course_services_1.CreateCourse)(data, res, next);
+        const thumbnail = data.thumbnail;
+        if (thumbnail) {
+            console.log("Uploading thumbnail to Cloudinary...");
+            try {
+                const myCloud = yield cloudinary_1.default.v2.uploader.upload(thumbnail, {
+                    folder: "courses",
+                    resource_type: "image",
+                });
+                console.log("Cloudinary upload successful:", {
+                    public_id: myCloud.public_id,
+                    url: myCloud.secure_url,
+                });
+                data.thumbnail = {
+                    public_id: myCloud.public_id,
+                    url: myCloud.secure_url,
+                };
+            }
+            catch (cloudinaryError) {
+                console.error("Cloudinary upload failed:", cloudinaryError.message, cloudinaryError.stack);
+                return next(new AppError_1.AppError(`Failed to upload thumbnail: ${cloudinaryError.message}`, 400));
+            }
+        }
+        else {
+            console.log("No thumbnail provided, setting to null.");
+            data.thumbnail = null;
+        }
+        console.log("Calling CreateCourse with data:", JSON.stringify(data, null, 2));
+        yield (0, course_services_1.CreateCourse)(data, res, next);
     }
     catch (err) {
-        console.log(err);
-        next(new AppError_1.AppError("course are not uploaded thair are some error happening ", 400));
+        console.error("Error in uploadCourse:", err.message, err.stack);
+        next(new AppError_1.AppError(`Course upload failed: ${err.message}`, 400));
     }
 }));
 exports.editCourse = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {

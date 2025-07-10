@@ -110,7 +110,7 @@
 //   links: [linkSchema],
 //   suggestion: { type: String },
 //   question: [commentSchema],
-  
+
 // });
 
 // // Course Schema
@@ -145,7 +145,7 @@
 // export default CourseModel;
 
 import mongoose, { Document, Schema } from "mongoose";
-import  { IUser } from  "./user.model";
+import { IUser } from "./user.model";
 
 // Define the IComment interface
 export interface IComment extends Document {
@@ -212,7 +212,10 @@ export interface ICourse extends Document {
   description: string;
   price: number;
   estimatedPrice: number;
-  thumbnail: string;
+  thumbnail: {
+    public_id: string;
+    url: string;
+  };
   tags: string[];
   level: string;
   demoUrl: string;
@@ -306,7 +309,10 @@ const courseSchema = new Schema<ICourse>(
     description: { type: String, required: true },
     price: { type: Number, required: true },
     estimatedPrice: { type: Number },
-    thumbnail: { type: String },
+    thumbnail: {
+      public_id: { type: String, required: true },
+      url: { type: String, required: true },
+    },
     tags: [{ type: String }],
     level: { type: String, required: true },
     demoUrl: { type: String },
@@ -339,13 +345,16 @@ const courseSchema = new Schema<ICourse>(
 // Calculate total duration before saving
 courseSchema.pre<ICourse>("save", function (next) {
   if (this.courseData && this.courseData.length > 0) {
-    this.duration = this.courseData.reduce((total, data) => total + (data.videoLength || 0), 0);
+    this.duration = this.courseData.reduce(
+      (total, data) => total + (data.videoLength || 0),
+      0
+    );
   }
   next();
 });
 
 // Method to update popularity score (could be called periodically)
-courseSchema.methods.updatePopularity = function() {
+courseSchema.methods.updatePopularity = function () {
   // Simple popularity algorithm that considers purchases, reviews, and recency
   const reviewWeight = 0.3;
   const purchaseWeight = 0.5;
@@ -355,12 +364,14 @@ courseSchema.methods.updatePopularity = function() {
   const purchaseScore = this.purchased || 0;
 
   // Recency score (higher for newer courses)
-  const ageInDays = (Date.now() - this.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+  const ageInDays =
+    (Date.now() - this.createdAt.getTime()) / (1000 * 60 * 60 * 24);
   const recencyScore = Math.max(100 - ageInDays, 0);
 
-  this.popularity = (reviewScore * reviewWeight) +
-                    (purchaseScore * purchaseWeight) +
-                    (recencyScore * recencyWeight);
+  this.popularity =
+    reviewScore * reviewWeight +
+    purchaseScore * purchaseWeight +
+    recencyScore * recencyWeight;
 
   return this.save();
 };

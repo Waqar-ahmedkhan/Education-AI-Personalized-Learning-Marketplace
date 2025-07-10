@@ -7,33 +7,48 @@ export async function middleware(request: NextRequest) {
 
   console.log(`Middleware: Processing ${pathname} with token: ${token ? 'present' : 'missing'}`);
 
-  const protectedRoutes = ['/admin-dashboard', '/user-dashboard', '/edit-profile', '/update-password', '/dashboard'];
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
-  const isAuthRoute = pathname === '/auth/login' || pathname === '/auth/admin-login' || pathname === '/auth/callback';
+  const protectedRoutes = [
+    '/admin-dashboard/:path*',
+    '/user-dashboard/:path*',
+    '/edit-profile',
+    '/update-password',
+    '/dashboard',
+    '/orders',
+    '/notifications',
+    '/courses/:path*', // Protect course routes
+  ];
+  const isProtectedRoute = protectedRoutes.some((route) => {
+    const regex = new RegExp(`^${route.replace(':path*', '.*')}$`);
+    return regex.test(pathname);
+  });
+  const isAuthRoute = ['/auth/login', '/auth/admin-login', '/auth/callback'].includes(pathname);
 
   if (isProtectedRoute && !token) {
-    console.log(`Middleware: No token for protected route ${pathname}, redirecting to /auth/login`);
-    return NextResponse.redirect(new URL(`/auth/login?error=Please+log+in&redirect=${encodeURIComponent(pathname)}`, request.url));
+    console.log(`Middleware: No token for protected route ${pathname}, redirecting to /forbidden`);
+    return NextResponse.redirect(new URL(`/forbidden?error=Please+log+in`, request.url));
   }
 
-  if (isProtectedRoute) {
+  if (isProtectedRoute && token) {
     try {
       const endpoint = pathname.startsWith('/admin-dashboard') ? '/api/v1/admin/me' : '/api/v1/user/me';
       const res = await fetch(`${baseUrl}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });
-      const data = await res.json() as { success: boolean; user?: { role: string } };
+      const data = await res.json();
       console.log(`Middleware: ${endpoint} response:`, { status: res.status, success: data.success, role: data.user?.role });
 
       if (!data.success) {
-        console.log(`Middleware: Invalid response for ${pathname}, clearing token and redirecting to /auth/login`);
-        const response = NextResponse.redirect(new URL(`/auth/login?error=Invalid+token&redirect=${encodeURIComponent(pathname)}`, request.url));
+        console.log(`Middleware: Invalid token for ${pathname}, redirecting to /forbidden`);
+        const response = NextResponse.redirect(new URL(`/forbidden?error=Invalid+token`, request.url));
         response.cookies.delete('access_token');
         return response;
       }
 
-      if (['/edit-profile', '/update-password', '/dashboard'].some(route => pathname.startsWith(route))) {
+      if (['/edit-profile', '/update-password', '/dashboard', '/courses/:path*'].some((route) => {
+        const regex = new RegExp(`^${route.replace(':path*', '.*')}$`);
+        return regex.test(pathname);
+      })) {
         if (!['user', 'admin'].includes(data.user?.role || '')) {
           console.log(`Middleware: Invalid role for ${pathname}, redirecting to /forbidden`);
           const response = NextResponse.redirect(new URL('/forbidden?error=Invalid+role', request.url));
@@ -53,7 +68,7 @@ export async function middleware(request: NextRequest) {
       }
     } catch (error) {
       console.error(`Middleware: Error fetching ${pathname}:`, error);
-      const response = NextResponse.redirect(new URL(`/auth/login?error=Invalid+token&redirect=${encodeURIComponent(pathname)}`, request.url));
+      const response = NextResponse.redirect(new URL(`/forbidden?error=Invalid+token`, request.url));
       response.cookies.delete('access_token');
       return response;
     }
@@ -66,7 +81,7 @@ export async function middleware(request: NextRequest) {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });
-      const data = await res.json() as { success: boolean; user?: { role: string } };
+      const data = await res.json();
       console.log(`Middleware: ${endpoint} response:`, { status: res.status, success: data.success, role: data.user?.role });
       if (data.success && data.user?.role) {
         const redirectUrl = data.user.role === 'admin' ? '/admin-dashboard' : '/dashboard';
@@ -83,7 +98,6 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// middleware.ts
 export const config = {
   matcher: [
     '/admin-dashboard/:path*',
@@ -91,11 +105,12 @@ export const config = {
     '/edit-profile',
     '/update-password',
     '/dashboard',
-    '/orders', // Added for admin order page
-    '/notifications', // Added for admin notification page
+    '/orders',
+    '/notifications',
     '/auth/login',
     '/auth/admin-login',
     '/auth/callback',
     '/initial-admin',
+    '/courses/:path*', // Added for course routes
   ],
 };

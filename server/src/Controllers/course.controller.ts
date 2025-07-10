@@ -22,28 +22,44 @@ import { getalluserServices } from "../services/user.services";
 export const uploadCourse = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      console.log("Received course data:", JSON.stringify(req.body, null, 2));
       const data = req.body;
-      const Thumbnail = data.thumbnail;
-      if (Thumbnail) {
-        const myCloud = await Cloudinary.v2.uploader.upload(Thumbnail, {
-          folder: "courses",
-        });
 
-        data.thumbnail = {
-          public_id: myCloud.public_id,
-          url: myCloud.secure_url,
-        };
+      // Validate that req.body is not empty
+      if (!data || Object.keys(data).length === 0) {
+        return next(new AppError("No course data provided in request body", 400));
       }
 
-      CreateCourse(data, res, next);
-    } catch (err) {
-      console.log(err);
-      next(
-        new AppError(
-          "course are not uploaded thair are some error happening ",
-          400
-        )
-      );
+      const thumbnail = data.thumbnail;
+      if (thumbnail) {
+        console.log("Uploading thumbnail to Cloudinary...");
+        try {
+          const myCloud = await Cloudinary.v2.uploader.upload(thumbnail, {
+            folder: "courses",
+            resource_type: "image",
+          });
+          console.log("Cloudinary upload successful:", {
+            public_id: myCloud.public_id,
+            url: myCloud.secure_url,
+          });
+          data.thumbnail = {
+            public_id: myCloud.public_id,
+            url: myCloud.secure_url,
+          };
+        } catch (cloudinaryError: any) {
+          console.error("Cloudinary upload failed:", cloudinaryError.message, cloudinaryError.stack);
+          return next(new AppError(`Failed to upload thumbnail: ${cloudinaryError.message}`, 400));
+        }
+      } else {
+        console.log("No thumbnail provided, setting to null.");
+        data.thumbnail = null;
+      }
+
+      console.log("Calling CreateCourse with data:", JSON.stringify(data, null, 2));
+      await CreateCourse(data, res, next);
+    } catch (err: any) {
+      console.error("Error in uploadCourse:", err.message, err.stack);
+      next(new AppError(`Course upload failed: ${err.message}`, 400));
     }
   }
 );

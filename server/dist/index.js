@@ -21,8 +21,8 @@ const analytics_route_1 = __importDefault(require("./routes/analytics.route"));
 dotenv_1.default.config();
 exports.app = (0, express_1.default)();
 // Middlewares
-exports.app.use(express_1.default.json());
-exports.app.use(body_parser_1.default.urlencoded({ extended: true }));
+exports.app.use(express_1.default.json({ limit: '10mb' }));
+exports.app.use(body_parser_1.default.urlencoded({ limit: '10mb', extended: true }));
 // app.use(cors({ origin: process.env.ORIGIN_URL }));
 exports.app.use((0, cors_1.default)({ origin: 'http://localhost:3000', credentials: true }));
 exports.app.use((0, cookie_parser_1.default)());

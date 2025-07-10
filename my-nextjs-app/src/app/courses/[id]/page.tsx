@@ -712,17 +712,17 @@ import { useAuth } from '../../../lib/auth';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
 import { motion } from 'framer-motion';
-import BackButton from './BackButton';
-import HeroSection from './HeroSection';
-import CourseActionPanel from './CourseActionPanel';
-import VideoPlayer from './VideoPlayer';
-import Curriculum from './Curriculum';
-import Description from './Description';
-import InstructorInfo from './InstructorInfo';
-import CourseStats from './CourseStats';
-import CourseCategory from './CourseCategory';
-import SkeletonCoursePage from './SkeletonCoursePage';
-import ErrorDisplay from './ErrorDisplay';
+import BackButton from '../../../../components/courses/';
+import HeroSection from '../../../../components/courses/';
+import CourseActionPanel from '../../../../components/courses/';
+import VideoPlayer from '../../../../components/courses/VideoPlayer';
+import Curriculum from '../../../../components/courses/VideoPlayer';
+import Description from '../../../../components/courses/VideoPlayer';
+import InstructorInfo from './../../../../components/courses/VideoPlayer';
+import CourseStats from '../../../../components/courses/VideoPlayer';
+import CourseCategory from '../../../../components/courses/VideoPlayer';
+import SkeletonCoursePage from '../../../../components/courses/VideoPlayer';
+import ErrorDisplay from '../../../../components/courses/VideoPlayer';
 import { Star } from 'lucide-react';
 
 // Type Definitions

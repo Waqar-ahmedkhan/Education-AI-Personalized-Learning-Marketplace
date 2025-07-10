@@ -1254,19 +1254,20 @@
 
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import {  useParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useAuth } from '../../../../lib/auth';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import BackButton from '../../../../components/courses/BackButton';
 import VideoPlayer from '../../../../components/courses/VideoPlayer';
-import Curriculum from '../../../../components/courses/';
-import CourseStats from '../../../../components/courses/CourseStats';
+import Curriculum from '../../../../components/courses/Curriculim';
+import CourseStats from '../../../../components/courses/CourseStat';
 import ProgressTracker from '../../../../components/courses/ProgressTracker';
-import LessonNavigation from '../../../../components/courses/LessonNavigation';
-import SkeletonCoursePage from '../../../../components/courses/SkeletonCoursePage';
+import LessonNavigation from '../../../../components/courses/LessionNavigation';
+import SkeletonCoursePage from '../../../../components/courses/SkeletonPage';
 import ErrorDisplay from '../../../../components/courses/ErrorDisplay';
+import { Star } from 'lucide-react';
 
 // Type Definitions (reused from GetSingleCoursePage.tsx)
 interface CourseInstructor {
@@ -1333,10 +1334,9 @@ const pageVariants = {
 };
 
 export default function CourseContent(): JSX.Element {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const { resolvedTheme } = useTheme();
   const params = useParams();
-  const router = useRouter();
   const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<CoursePageError | null>(null);
@@ -1351,7 +1351,7 @@ export default function CourseContent(): JSX.Element {
     return null;
   }, [params.id]);
 
-  const handleError = useCallback((err: any): CoursePageError => {
+  const handleError = useCallback((err: unknown): CoursePageError => {
     if (err.response) {
       switch (err.response.status) {
         case 401:
@@ -1410,7 +1410,7 @@ export default function CourseContent(): JSX.Element {
       if (courseData.courseData?.[0]?.videoUrl) {
         setActiveVideo(courseData.courseData[0].videoUrl);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(handleError(err));
     } finally {
       setIsLoading(false);
@@ -1451,7 +1451,7 @@ export default function CourseContent(): JSX.Element {
               : null
           );
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         setError({ type: 'UNKNOWN_ERROR', message: 'Failed to update progress' });
       }
     },

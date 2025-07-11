@@ -15,7 +15,6 @@ export async function middleware(request: NextRequest) {
     '/dashboard',
     '/orders',
     '/notifications',
-    '/courses/:path*', // Protect course routes
   ];
   const isProtectedRoute = protectedRoutes.some((route) => {
     const regex = new RegExp(`^${route.replace(':path*', '.*')}$`);
@@ -45,7 +44,7 @@ export async function middleware(request: NextRequest) {
         return response;
       }
 
-      if (['/edit-profile', '/update-password', '/dashboard', '/courses/:path*'].some((route) => {
+      if (['/edit-profile', '/update-password', '/dashboard'].some((route) => {
         const regex = new RegExp(`^${route.replace(':path*', '.*')}$`);
         return regex.test(pathname);
       })) {
@@ -111,6 +110,5 @@ export const config = {
     '/auth/admin-login',
     '/auth/callback',
     '/initial-admin',
-    '/courses/:path*', // Added for course routes
   ],
 };

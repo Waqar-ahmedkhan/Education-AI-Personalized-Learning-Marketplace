@@ -11,7 +11,7 @@ interface AdminControlsProps {
   isDeleting?: boolean;
 }
 
-const AdminControls: React.FC<AdminControlsProps> = ({ courseId, onEdit, onDelete, isDeleting = false }) => {
+const AdminControls: React.FC<AdminControlsProps> = ({ onEdit, onDelete, isDeleting = false }) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   return (

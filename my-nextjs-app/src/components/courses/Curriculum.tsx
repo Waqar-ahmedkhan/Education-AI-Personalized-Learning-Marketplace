@@ -3,7 +3,7 @@ import React from 'react';
 import { useTheme } from 'next-themes';
 import { BookOpen, PlayCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Course } from './GetSingleCoursePage';
+import { Course } from "@/types/course";
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },
@@ -137,14 +137,17 @@ const Curriculum: React.FC<CurriculumProps> = ({
                               }`}
                             >
                               Lesson {lecture.order}
-                              {lecture.duration && ` • ${Math.floor(lecture.duration / 60)}:${String(lecture.duration % 60).padStart(2, '0')}`}
+                              {lecture.videoLength !== undefined &&
+                                ` • ${Math.floor(lecture.videoLength / 60)}:${String(lecture.videoLength % 60).padStart(2, '0')}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
                             {lecture.isRequired && (
                               <span
                                 className={`text-xs px-2 py-1 rounded-full ${
-                                  isDark ? 'bg-red-900/30 text-red-400 border border-red-800' : 'bg-red-100 text-red-600 border border-red-200'
+                                  isDark
+                                    ? 'bg-red-900/30 text-red-400 border border-red-800'
+                                    : 'bg-red-100 text-red-600 border border-red-200'
                                 }`}
                               >
                                 Required

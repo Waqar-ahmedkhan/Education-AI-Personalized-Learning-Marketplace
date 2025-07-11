@@ -3,7 +3,7 @@ import React from 'react';
 import { useTheme } from 'next-themes';
 import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Course } from './CourseContent';
+import { Course } from '@/types/course';
 
 const cardVariants = {
   initial: { opacity: 0, y: 20 },

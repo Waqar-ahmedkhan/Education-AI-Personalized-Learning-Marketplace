@@ -102,29 +102,22 @@ exports.editCourse = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
 exports.GetSingleCourse = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const courseId = req.params.id;
+        if (!courseId)
+            return next(new AppError_1.AppError("Missing course ID", 400));
         const isCachedExisted = yield RedisConnect_1.client.get(courseId);
         if (isCachedExisted) {
             const course = JSON.parse(isCachedExisted);
-            return res.status(200).json({
-                success: true,
-                course,
-            });
+            return res.status(200).json({ success: true, data: course });
         }
-        else {
-            const course = yield Course_model_1.default.findById(courseId).select("-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links");
-            yield RedisConnect_1.client.set(courseId, JSON.stringify(course), { EX: 6048000 });
-            if (!course) {
-                return next(new AppError_1.AppError("Course not found", 404));
-            }
-            res.status(200).json({
-                success: true,
-                data: course,
-            });
-        }
+        const course = yield Course_model_1.default.findById(courseId).select("-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links");
+        if (!course)
+            return next(new AppError_1.AppError("Course not found", 404));
+        yield RedisConnect_1.client.set(courseId, JSON.stringify(course), { EX: 6048000 });
+        res.status(200).json({ success: true, data: course });
     }
     catch (err) {
-        console.error(err);
-        next(new AppError_1.AppError("Courses are not fetched; there was an error processing the request", 400));
+        console.error("GetSingleCourse error:", err);
+        next(new AppError_1.AppError("Failed to fetch course", 500));
     }
 }));
 // getall courses but without purchaseing
@@ -154,26 +147,23 @@ exports.getallCourses = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) 
     }
 }));
 exports.getCoursesbyUser = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const userCousesList = (_a = req.user) === null || _a === void 0 ? void 0 : _a.courses;
-        const courseId = req.params.user;
-        const courseExists = userCousesList === null || userCousesList === void 0 ? void 0 : userCousesList.find((course) => {
-            course._id.toString() == courseId;
-        });
-        if (!courseExists) {
-            return next(new AppError_1.AppError("you are not eligible to access this course ", 404));
-        }
+        const courseId = req.params.id;
+        if (!courseId)
+            return next(new AppError_1.AppError("Missing course ID", 400));
         const course = yield Course_model_1.default.findById(courseId);
-        const content = course === null || course === void 0 ? void 0 : course.courseData;
-        res.status(200).send({
+        if (!course)
+            return next(new AppError_1.AppError("Course not found", 404));
+        res.status(200).json({
             success: true,
-            message: "get courses by user",
-            content,
+            data: {
+                courseData: course.courseData || [],
+            },
         });
     }
-    catch (_b) {
-        next(new AppError_1.AppError("error in courses by users ", 400));
+    catch (err) {
+        console.error("getCoursesbyUser error:", err);
+        next(new AppError_1.AppError("Failed to get course content", 500));
     }
 }));
 exports.addQuestion = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {

@@ -5,16 +5,6 @@ import connectDB from "./utils/dbConnect";
 dotenv.config();
 
 
-// import { Request, Response } from "express";
-
-// export const testCloudinary = async (req: Request, res: Response) => {
-//   try {
-//     const result = await Cloudinary.v2.api.test();
-//     res.status(200).json({ success: true, message: "Cloudinary connected", result });
-//   } catch (err: any) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
 
 Cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

@@ -27,9 +27,8 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <GoogleOAuthProvider
-            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}
-          >
+         <GoogleOAuthProvider clientId="84827681779-b8al43fq2e9v54vbcqieo56o6qsos8d6.apps.googleusercontent.com">
+
             
             <AuthProvider>
               <Navbar />

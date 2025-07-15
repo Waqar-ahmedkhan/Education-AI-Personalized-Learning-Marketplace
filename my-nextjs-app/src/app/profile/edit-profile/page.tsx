@@ -20,7 +20,7 @@ interface FormData {
 }
 
 export default function UpdateInfo() {
-  const { userName, isLoading, isAuthenticated } = useAuth();
+  const { userName, token, isLoading, isTokenExpired } = useAuth();
   const { theme, systemTheme } = useTheme();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -31,11 +31,11 @@ export default function UpdateInfo() {
 
   useEffect(() => {
     setMounted(true);
-    if (!isLoading && !isAuthenticated) {
+    if (!isLoading && (!token || isTokenExpired)) {
       console.log('UpdateInfo: Not authenticated, redirecting to /auth/login');
       router.push('/auth/login?error=Please+log+in');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, token, isTokenExpired, router]);
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -44,12 +44,17 @@ export default function UpdateInfo() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('access_token') || Cookies.get('access_token')}`,
+          Authorization: `Bearer ${Cookies.get('access_token')}`,
         },
         credentials: 'include',
         body: JSON.stringify(data),
       });
       const result = await res.json();
+      console.log('UpdateInfo: Update profile response:', {
+        status: res.status,
+        success: result.success,
+        message: result.message,
+      });
       if (result.success) {
         router.push('/profiles?success=Profile+updated+successfully');
       } else {
@@ -57,7 +62,7 @@ export default function UpdateInfo() {
       }
     } catch (err) {
       setError('Failed to connect to the server');
-      console.error('Update info error:', err);
+      console.error('UpdateInfo: Update profile error:', err);
     }
   };
 

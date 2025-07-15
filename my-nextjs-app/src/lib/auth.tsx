@@ -39,8 +39,10 @@ interface AuthContextType {
   userAvatar: { public_id: string; url: string } | null;
   isLoading: boolean;
   isTokenExpired: boolean;
+  isAuthenticated: boolean;
   login: (email: string, password: string, isAdmin?: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  loginWithToken: (data: LoginResponse) => void;
   isAdmin: boolean;
 }
 
@@ -54,6 +56,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(!!token);
   const [isTokenExpired, setIsTokenExpired] = useState<boolean>(false);
   const router = useRouter();
+
+  const loginWithToken = (data: LoginResponse) => {
+    setToken(data.accessToken!);
+    setUserRole(data.user.role);
+    setUserName(data.user.name);
+    setUserAvatar(data.user.avatar || null);
+    setIsTokenExpired(false);
+    sessionStorage.setItem(
+      'userData',
+      JSON.stringify({
+        role: data.user.role,
+        name: data.user.name,
+        avatar: data.user.avatar,
+      })
+    );
+    Cookies.set('access_token', data.accessToken!, {
+      expires: 7,
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+  };
 
   useEffect(() => {
     console.log('AuthProvider: Initializing with token:', token ? 'present' : 'missing');
@@ -181,26 +205,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(res.data.message || 'Login failed');
       }
 
-      Cookies.set('access_token', res.data.accessToken, {
-        expires: 7,
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
+      loginWithToken(res.data);
 
-      setToken(res.data.accessToken);
-      setUserRole(res.data.user.role);
-      setUserName(res.data.user.name);
-      setUserAvatar(res.data.user.avatar || null);
-      setIsTokenExpired(false);
-      sessionStorage.setItem(
-        'userData',
-        JSON.stringify({
-          role: res.data.user.role,
-          name: res.data.user.name,
-          avatar: res.data.user.avatar,
-        })
-      );
       console.log(`AuthProvider: Login successful, redirecting to ${res.data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard'}`);
       router.push(res.data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard');
     } catch (error) {
@@ -267,8 +273,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userAvatar,
         isLoading,
         isTokenExpired,
+        isAuthenticated: !!token && !isTokenExpired,
         login,
         logout,
+        loginWithToken,
         isAdmin: userRole === 'admin',
       }}
     >

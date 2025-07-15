@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/lib/auth';
 import LoginForm from '@/components/ui/auth/LoginForm';
 import SocialAuthButtons from '@/components/ui/auth/SoicalAuthButtons';
 import AuthLinks from '@/components/ui/auth/AuthLinks';
@@ -16,6 +17,10 @@ interface ApiResponse {
     email: string;
     role: string;
     isVerified: boolean;
+    avatar?: {
+      public_id: string;
+      url: string;
+    };
   };
   accessToken?: string;
 }
@@ -28,6 +33,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const { theme, systemTheme } = useTheme();
   const emailInputRef = useRef<HTMLInputElement>(null);
+  const { login } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -36,24 +42,18 @@ export default function LoginPage() {
 
   const isDark = theme === 'system' ? systemTheme === 'dark' : theme === 'dark';
 
-  const handleLoginSuccess = (data: ApiResponse) => {
+  const handleLoginSuccess = async (data: ApiResponse) => {
     if (data.success && data.user && data.accessToken) {
-      sessionStorage.setItem(
-        'userData',
-        JSON.stringify({
-          _id: data.user._id,
-          name: data.user.name,
-          email: data.user.email,
-          role: data.user.role,
-        })
-      );
-      sessionStorage.setItem('accessToken', data.accessToken);
-
-      if (!data.user.isVerified) {
-        sessionStorage.setItem('activationToken', data.accessToken);
-        router.push(`/activation?email=${encodeURIComponent(data.user.email)}`);
-      } else {
-        router.push('/user-dashboard');
+      try {
+        await login(data.user.email, '', false); // Password not needed since token is provided
+        if (!data.user.isVerified) {
+          sessionStorage.setItem('activationToken', data.accessToken);
+          router.push(`/activation?email=${encodeURIComponent(data.user.email)}`);
+        } else {
+          router.push('/user-dashboard');
+        }
+      } catch (error: any) {
+        setGeneralError(error.message || 'Failed to process login');
       }
     } else {
       setGeneralError(data.message || 'Invalid email or password');
@@ -86,7 +86,7 @@ export default function LoginPage() {
         </div>
 
         <LoginForm
-          emailInputRef={emailInputRef}   
+          emailInputRef={emailInputRef}
           initialEmail={searchParams.get('email') || ''}
           onSuccess={handleLoginSuccess}
           setGeneralError={setGeneralError}

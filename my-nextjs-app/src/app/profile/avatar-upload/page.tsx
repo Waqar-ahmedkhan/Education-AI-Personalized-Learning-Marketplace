@@ -17,7 +17,7 @@ interface FormData {
 }
 
 export default function AvatarUpload() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, token } = useAuth();
   const { theme, systemTheme } = useTheme();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -27,6 +27,7 @@ export default function AvatarUpload() {
   useEffect(() => {
     setMounted(true);
     if (!isAuthenticated && !isLoading) {
+      console.log('AvatarUpload: Not authenticated, redirecting to /auth/login');
       router.push('/auth/login');
     }
   }, [isAuthenticated, isLoading, router]);
@@ -34,7 +35,10 @@ export default function AvatarUpload() {
   const onSubmit = async (data: FormData) => {
     try {
       const file = data.avatar[0];
-      if (!file) return;
+      if (!file) {
+        setError('No file selected');
+        return;
+      }
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = async () => {
@@ -43,16 +47,22 @@ export default function AvatarUpload() {
           setError('Failed to process image');
           return;
         }
-        const res = await fetch('http://localhost:8080/api/v1/user/avatar-upload', {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        const res = await fetch(`${baseUrl}/api/v1/user/avatar-upload`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+            Authorization: `Bearer ${token}`,
           },
           credentials: 'include',
           body: JSON.stringify({ avatar: base64Image }),
         });
         const result = await res.json();
+        console.log('AvatarUpload: Upload response:', {
+          status: res.status,
+          success: result.success,
+          message: result.message,
+        });
         if (result.success) {
           router.push('/profiles');
         } else {
@@ -61,7 +71,7 @@ export default function AvatarUpload() {
       };
     } catch (err) {
       setError('Failed to connect to the server');
-      console.error('Avatar upload error:', err);
+      console.error('AvatarUpload: Upload error:', err);
     }
   };
 

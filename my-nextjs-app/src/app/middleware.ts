@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface UserResponse {
+  success: boolean;
+  user?: {
+    role: string;
+  };
+  message?: string;
+}
+
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get('access_token')?.value;
   const { pathname } = request.nextUrl;
@@ -23,72 +31,80 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = ['/auth/login', '/auth/admin-login', '/auth/callback'].includes(pathname);
 
   if (isProtectedRoute && !token) {
-    console.log(`Middleware: No token for protected route ${pathname}, redirecting to /forbidden`);
-    return NextResponse.redirect(new URL(`/forbidden?error=Please+log+in`, request.url));
+    console.log(`Middleware: No token for protected route ${pathname}, redirecting to /auth/login`);
+    return NextResponse.redirect(new URL('/auth/login?error=Please+log+in', request.url));
   }
 
   if (isProtectedRoute && token) {
     try {
-      const endpoint = pathname.startsWith('/admin-dashboard') ? '/api/v1/admin/me' : '/api/v1/user/me';
+      const endpoint: string = pathname.startsWith('/admin-dashboard') ? '/api/v1/admin/me' : '/api/v1/user/me';
       const res = await fetch(`${baseUrl}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });
-      const data = await res.json();
-      console.log(`Middleware: ${endpoint} response:`, { status: res.status, success: data.success, role: data.user?.role });
+      const data: UserResponse = await res.json();
+      console.log(`Middleware: ${endpoint} response:`, {
+        status: res.status,
+        success: data.success,
+        role: data.user?.role,
+        message: data.message,
+      });
 
       if (!data.success) {
-        console.log(`Middleware: Invalid token for ${pathname}, redirecting to /forbidden`);
-        const response = NextResponse.redirect(new URL(`/forbidden?error=Invalid+token`, request.url));
-        response.cookies.delete('access_token');
+        console.log(`Middleware: Invalid token for ${pathname}, redirecting to /auth/login`);
+        const response = NextResponse.redirect(new URL('/auth/login?error=Invalid+token', request.url));
+        if (res.status === 401) {
+          response.cookies.delete('access_token');
+          console.log('Middleware: Deleted access_token cookie due to 401 Unauthorized');
+        }
         return response;
       }
 
-      if (['/edit-profile', '/update-password', '/dashboard'].some((route) => {
-        const regex = new RegExp(`^${route.replace(':path*', '.*')}$`);
-        return regex.test(pathname);
-      })) {
+      if (pathname === '/edit-profile' || pathname === '/update-password' || pathname === '/dashboard') {
         if (!['user', 'admin'].includes(data.user?.role || '')) {
-          console.log(`Middleware: Invalid role for ${pathname}, redirecting to /forbidden`);
-          const response = NextResponse.redirect(new URL('/forbidden?error=Invalid+role', request.url));
-          response.cookies.delete('access_token');
-          return response;
+          console.log(`Middleware: Invalid role ${data.user?.role} for ${pathname}, redirecting to /auth/login`);
+          return NextResponse.redirect(new URL('/auth/login?error=Invalid+role', request.url));
         }
       } else if (pathname.startsWith('/admin-dashboard') && data.user?.role !== 'admin') {
-        console.log('Middleware: Non-admin accessing /admin-dashboard, redirecting to /forbidden');
-        const response = NextResponse.redirect(new URL('/forbidden?error=Access+denied.+Admin+role+required', request.url));
-        response.cookies.delete('access_token');
-        return response;
+        console.log('Middleware: Non-admin accessing /admin-dashboard, redirecting to /auth/login');
+        return NextResponse.redirect(new URL('/auth/login?error=Access+denied.+Admin+role+required', request.url));
       } else if (pathname.startsWith('/user-dashboard') && data.user?.role !== 'user') {
-        console.log('Middleware: Non-user accessing /user-dashboard, redirecting to /forbidden');
-        const response = NextResponse.redirect(new URL('/forbidden?error=Access+denied.+User+access+only', request.url));
-        response.cookies.delete('access_token');
-        return response;
+        console.log('Middleware: Non-user accessing /user-dashboard, redirecting to /auth/login');
+        return NextResponse.redirect(new URL('/auth/login?error=Access+denied.+User+access+only', request.url));
       }
     } catch (error) {
-      console.error(`Middleware: Error fetching ${pathname}:`, error);
-      const response = NextResponse.redirect(new URL(`/forbidden?error=Invalid+token`, request.url));
-      response.cookies.delete('access_token');
-      return response;
+      console.error(`Middleware: Error fetching ${pathname}:`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      console.log(`Middleware: Allowing request to ${pathname} despite fetch error`);
+      return NextResponse.next();
     }
   }
 
   if (isAuthRoute && token) {
     try {
-      const endpoint = pathname.includes('admin-login') ? '/api/v1/admin/me' : '/api/v1/user/me';
+      const endpoint: string = pathname.includes('admin-login') ? '/api/v1/admin/me' : '/api/v1/user/me';
       const res = await fetch(`${baseUrl}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });
-      const data = await res.json();
-      console.log(`Middleware: ${endpoint} response:`, { status: res.status, success: data.success, role: data.user?.role });
+      const data: UserResponse = await res.json();
+      console.log(`Middleware: ${endpoint} response:`, {
+        status: res.status,
+        success: data.success,
+        role: data.user?.role,
+        message: data.message,
+      });
       if (data.success && data.user?.role) {
         const redirectUrl = data.user.role === 'admin' ? '/admin-dashboard' : '/dashboard';
         console.log(`Middleware: Valid token, redirecting to ${redirectUrl}`);
         return NextResponse.redirect(new URL(redirectUrl, request.url));
       }
     } catch (error) {
-      console.error(`Middleware: Error fetching :`, error);
+      console.error(`Middleware: Error fetching ${pathname}:`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      console.log(`Middleware: Allowing request to ${pathname} despite fetch error`);
       return NextResponse.next();
     }
   }
@@ -102,6 +118,9 @@ export const config = {
     '/admin-dashboard/:path*',
     '/user-dashboard/:path*',
     '/edit-profile',
+    '/change-password',
+    'avatar-upload',
+    '/update-info',
     '/update-password',
     '/dashboard',
     '/orders',

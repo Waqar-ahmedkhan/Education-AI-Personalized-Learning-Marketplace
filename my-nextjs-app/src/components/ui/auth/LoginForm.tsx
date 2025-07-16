@@ -14,9 +14,9 @@ interface FormErrors {
 }
 
 interface LoginFormProps {
- emailInputRef: RefObject<HTMLInputElement | null>;
+  emailInputRef: RefObject<HTMLInputElement | null>;
   initialEmail: string;
-  onSuccess: (data: ApiResponse) => void;
+  onSuccess: (data: ApiResponse) => Promise<void>;
   generalError: string | null;
   setGeneralError: (error: string | null) => void;
   isLoading: boolean;
@@ -26,14 +26,18 @@ interface LoginFormProps {
 interface ApiResponse {
   success: boolean;
   message?: string;
-  user?: {
+  user: {
     _id: string;
     name: string;
     email: string;
     role: string;
     isVerified: boolean;
+    avatar?: {
+      public_id: string;
+      url: string;
+    };
   };
-  accessToken?: string;
+  accessToken: string;
 }
 
 export default function LoginForm({
@@ -55,12 +59,10 @@ export default function LoginForm({
   const submitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDark = theme === 'system' ? systemTheme === 'dark' : theme === 'dark';
 
-  // Track render count for debugging
   useEffect(() => {
     console.log('LoginForm rendered');
   });
 
-  // Form Validation
   const validateForm = useCallback((): boolean => {
     const newErrors: FormErrors = {};
 
@@ -92,7 +94,6 @@ export default function LoginForm({
     return Object.keys(newErrors).length === 0;
   }, [formData]);
 
-  // Handle Input Changes
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const { name, value } = e.target;
@@ -103,7 +104,6 @@ export default function LoginForm({
     [setGeneralError]
   );
 
-  // Handle Form Submission
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -144,7 +144,7 @@ export default function LoginForm({
           if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
             console.error('Non-JSON response:', text);
-            setGeneralError('Email and password were wrong. Please try again.');
+            setGeneralError('Email or password is incorrect. Please try again.');
             return;
           }
 
@@ -154,12 +154,12 @@ export default function LoginForm({
             console.log('Parsed response:', data);
           } catch (jsonError) {
             console.error('JSON parsing error:', jsonError, 'Response text:', await response.text());
-            setGeneralError('Email and password were wrong. Please try again.');
+            setGeneralError('Email or password is incorrect. Please try again.');
             return;
           }
 
           if (data.success) {
-            onSuccess(data);
+            await onSuccess(data);
           } else {
             switch (data.message) {
               case 'Please enter both email and password':
@@ -169,18 +169,18 @@ export default function LoginForm({
                 });
                 break;
               case 'Email not found':
-                setErrors({ email: 'Wrong email' });
+                setErrors({ email: 'Email not found' });
                 break;
               case 'Incorrect password':
-                setErrors({ password: 'Wrong password' });
+                setErrors({ password: 'Incorrect password' });
                 break;
-              case 'This login is for users only. Please use the admin login.':
-                setGeneralError('This login is for users only. Please use the admin login.');
+              case 'Invalid session':
+                setGeneralError('Your session has expired. Please log in again.');
                 break;
               case 'Error during user login':
               case 'Internal server error':
               case 'Something went wrong':
-                setGeneralError('Email and password were wrong. Please try again.');
+                setGeneralError('Email or password is incorrect. Please try again.');
                 break;
               default:
                 setGeneralError(data.message || 'An error occurred during login');
@@ -191,14 +191,13 @@ export default function LoginForm({
           setGeneralError(
             error instanceof Error && error.name === 'AbortError'
               ? 'Request timed out. Please try again.'
-              : 'Email and password were wrong. Please try again.'
+              : 'Email or password is incorrect. Please try again.'
           );
         } finally {
           setIsLoading(false);
         }
       }, 300);
 
-      // Cleanup timeout on unmount or new submission
       return () => {
         if (submitTimeoutRef.current) {
           clearTimeout(submitTimeoutRef.current);
@@ -208,7 +207,6 @@ export default function LoginForm({
     [formData, isLoading, validateForm, onSuccess, setGeneralError, setIsLoading]
   );
 
-  // Cleanup effect
   useEffect(() => {
     return () => {
       if (submitTimeoutRef.current) {
@@ -217,10 +215,8 @@ export default function LoginForm({
     };
   }, []);
 
-  // Render the Form
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Email Input */}
       <div>
         <label
           htmlFor="email"
@@ -287,7 +283,6 @@ export default function LoginForm({
         )}
       </div>
 
-      {/* Password Input */}
       <div>
         <label
           htmlFor="password"
@@ -396,7 +391,6 @@ export default function LoginForm({
         )}
       </div>
 
-      {/* General Error Message */}
       {generalError && (
         <p className="mt-2 text-sm text-red-500 dark:text-red-400 flex items-center">
           <svg
@@ -414,7 +408,6 @@ export default function LoginForm({
         </p>
       )}
 
-      {/* Submit Button */}
       <button
         type="submit"
         disabled={isLoading}

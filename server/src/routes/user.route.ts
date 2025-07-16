@@ -12,6 +12,7 @@ import {
   UpdateProfilePicture,
   forgetPassword,
   resetPassword,
+  validateToken,
 } from "../Controllers/user.controller";
 import { isAuthenticated, isUser } from "../middlewares/auth";
 import rateLimit from "express-rate-limit";
@@ -58,5 +59,6 @@ UserRoute.put(
   isUser,
   UpdateProfilePicture
 );
+// UserRoute.get("/user/validation-token", isAuthenticated, validateToken);
 
 export default UserRoute;

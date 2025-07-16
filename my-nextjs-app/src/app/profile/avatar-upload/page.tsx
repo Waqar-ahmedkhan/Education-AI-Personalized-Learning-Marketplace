@@ -22,57 +22,69 @@ export default function AvatarUpload() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
 
   useEffect(() => {
     setMounted(true);
-    if (!isAuthenticated && !isLoading) {
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !isAuthenticated && !isLoading) {
       console.log('AvatarUpload: Not authenticated, redirecting to /auth/login');
       router.push('/auth/login');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [mounted, isAuthenticated, isLoading, router]);
 
   const onSubmit = async (data: FormData) => {
-    try {
-      const file = data.avatar[0];
-      if (!file) {
-        setError('No file selected');
-        return;
-      }
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const base64Image = reader.result?.toString().split(',')[1];
-        if (!base64Image) {
+    setError(null);
+    const file = data.avatar?.[0];
+
+    if (!file) {
+      setError('No file selected');
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = async () => {
+      try {
+        const base64 = reader.result?.toString();
+
+        if (!base64) {
           setError('Failed to process image');
           return;
         }
+
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-        const res = await fetch(`${baseUrl}/api/v1/user/avatar-upload`, {
+        const response = await fetch(`${baseUrl}/api/v1/user/avatar-upload`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
           credentials: 'include',
-          body: JSON.stringify({ avatar: base64Image }),
+          body: JSON.stringify({ avatar: base64 }), // full data URI
         });
-        const result = await res.json();
-        console.log('AvatarUpload: Upload response:', {
-          status: res.status,
-          success: result.success,
-          message: result.message,
-        });
-        if (result.success) {
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
           router.push('/profiles');
         } else {
           setError(result.message || 'Failed to upload avatar');
         }
-      };
-    } catch (err) {
-      setError('Failed to connect to the server');
-      console.error('AvatarUpload: Upload error:', err);
-    }
+      } catch (err) {
+        console.error('Upload error:', err);
+        setError('Upload failed. Please try again.');
+      }
+    };
+
+    reader.onerror = () => {
+      setError('Error reading file');
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const isDark = theme === 'system' ? systemTheme === 'dark' : theme === 'dark';
@@ -91,7 +103,9 @@ export default function AvatarUpload() {
 
   return (
     <div
-      className={`min-h-screen p-6 bg-gradient-to-br ${isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'}`}
+      className={`min-h-screen p-6 bg-gradient-to-br ${
+        isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'
+      }`}
     >
       <motion.div
         className="container mx-auto max-w-md"
@@ -126,7 +140,10 @@ export default function AvatarUpload() {
                 />
                 {errors.avatar && <p className="text-red-500 text-sm mt-1">{errors.avatar.message}</p>}
               </div>
-              <Button type="submit" className={`${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'} text-white`}>
+              <Button
+                type="submit"
+                className={`${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'} text-white`}
+              >
                 Upload Avatar
               </Button>
             </form>

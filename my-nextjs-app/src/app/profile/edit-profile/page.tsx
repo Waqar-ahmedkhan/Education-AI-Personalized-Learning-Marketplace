@@ -10,59 +10,64 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
-import Cookies from 'js-cookie';
+import { XCircle } from 'lucide-react';
 
 interface FormData {
   name: string;
-  email: string;
 }
 
 export default function UpdateInfo() {
-  const { userName, token, isLoading, isTokenExpired } = useAuth();
+  const { isLoading, isAuthenticated, token, userName } = useAuth();
   const { theme, systemTheme } = useTheme();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
-    defaultValues: { name: userName || '', email: '' },
-  });
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+  } = useForm<FormData>();
 
   useEffect(() => {
     setMounted(true);
-    if (!isLoading && (!token || isTokenExpired)) {
-      console.log('UpdateInfo: Not authenticated, redirecting to /auth/login');
-      router.push('/auth/login?error=Please+log+in');
+    setValue('name', userName || '');
+  }, [userName, setValue]);
+
+  useEffect(() => {
+    if (mounted && !isAuthenticated && !isLoading) {
+      router.push('/auth/login');
     }
-  }, [isLoading, token, isTokenExpired, router]);
+  }, [mounted, isAuthenticated, isLoading, router]);
 
   const onSubmit = async (data: FormData) => {
+    setError(null);
+    setSuccess(null);
+
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const res = await fetch(`${baseUrl}/api/v1/user/update-info`, {
+      const response = await fetch(`${baseUrl}/api/v1/user/update-info`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${Cookies.get('access_token')}`,
+          Authorization: `Bearer ${token}`,
         },
         credentials: 'include',
         body: JSON.stringify(data),
       });
-      const result = await res.json();
-      console.log('UpdateInfo: Update profile response:', {
-        status: res.status,
-        success: result.success,
-        message: result.message,
-      });
-      if (result.success) {
-        router.push('/profiles?success=Profile+updated+successfully');
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSuccess('Information updated successfully.');
       } else {
-        setError(result.message || 'Failed to update profile');
+        setError(result.message || 'Failed to update information');
       }
     } catch (err) {
-      setError('Failed to connect to the server');
-      console.error('UpdateInfo: Update profile error:', err);
+      console.error('Update error:', err);
+      setError('Something went wrong. Please try again.');
     }
   };
 
@@ -82,49 +87,56 @@ export default function UpdateInfo() {
 
   return (
     <div
-      className={`min-h-screen p-4 sm:p-6 bg-gradient-to-br ${isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'} flex items-center justify-center`}
+      className={`min-h-screen p-6 bg-gradient-to-br ${
+        isDark ? 'from-gray-900 via-indigo-900 to-purple-900' : 'from-gray-100 via-indigo-200 to-purple-200'
+      }`}
     >
       <motion.div
-        className="w-full max-w-md"
+        className="container mx-auto max-w-md"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="backdrop-blur-lg bg-gray-800/70 dark:bg-gray-800/70 border-gray-700/50 dark:border-gray-700/50">
+        <Card className={`backdrop-blur-lg ${isDark ? 'bg-gray-800/70 border-gray-700/50' : 'bg-white/70 border-gray-200/50'} shadow-xl`}>
           <CardHeader>
-            <CardTitle>Update Profile</CardTitle>
+            <CardTitle className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
+              Update Information
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertDescription className="flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  {error}
-                </AlertDescription>
-              </Alert>
+            {(error || success) && (
+              <div
+                className={`mb-4 p-4 rounded-lg border ${
+                  error
+                    ? isDark
+                      ? 'bg-red-900/20 border-red-500 text-red-400'
+                      : 'bg-red-50 border-red-200 text-red-600'
+                    : isDark
+                    ? 'bg-green-900/20 border-green-500 text-green-400'
+                    : 'bg-green-50 border-green-200 text-green-700'
+                }`}
+              >
+                <p className="text-sm flex items-center">
+                  <XCircle className="w-4 h-4 mr-2" />
+                  {error || success}
+                </p>
+              </div>
             )}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+              <div>
+                <Label htmlFor="name" className="text-gray-700 dark:text-gray-300">Full Name</Label>
                 <Input
                   id="name"
-                  {...register('name', { required: 'Name is required', minLength: { value: 2, message: 'Name must be at least 2 characters' } })}
+                  {...register('name', { required: 'Name is required' })}
                   className={isDark ? 'bg-gray-700 text-gray-200' : 'bg-white text-gray-800'}
                 />
-                {errors.name && <p className="text-destructive text-sm">{errors.name.message}</p>}
+                {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...register('email', { pattern: { value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, message: 'Invalid email' } })}
-                  className={isDark ? 'bg-gray-700 text-gray-200' : 'bg-white text-gray-800'}
-                />
-                {errors.email && <p className="text-destructive text-sm">{errors.email.message}</p>}
-              </div>
-              <Button type="submit" className={`w-full ${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'} text-white`}>
-                Save Changes
+              <Button
+                type="submit"
+                className={`${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'} text-white`}
+              >
+                Update Info
               </Button>
             </form>
           </CardContent>

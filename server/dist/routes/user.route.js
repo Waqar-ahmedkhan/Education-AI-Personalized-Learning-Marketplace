@@ -31,4 +31,5 @@ UserRoute.get("/user/me", auth_1.isAuthenticated, auth_1.isUser, user_controller
 UserRoute.put("/user/update-info", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.UpdateUserInformation);
 UserRoute.put("/user/update-password", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.UpdatePassword);
 UserRoute.put("/user/avatar-upload", auth_1.isAuthenticated, auth_1.isUser, user_controller_1.UpdateProfilePicture);
+// UserRoute.get("/user/validation-token", isAuthenticated, validateToken);
 exports.default = UserRoute;

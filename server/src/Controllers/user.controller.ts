@@ -1293,3 +1293,23 @@ export const resetPassword = CatchAsyncError(
     }
   }
 );
+
+
+export const validateToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.headers.authorization?.split('Bearer ')[1];
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    // Check if token exists in Redis
+    const session = await client.get(`session:${token}`);
+    if (!session) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    }
+
+    res.status(200).json({ success: true, message: 'Token is valid' });
+  } catch (error) {
+    next(error);
+  }
+};

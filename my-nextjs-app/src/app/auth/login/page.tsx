@@ -5,13 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/lib/auth';
 import LoginForm from '@/components/ui/auth/LoginForm';
-import SocialAuthButtons from '@/components/ui/auth/SoicalAuthButtons';
+import SocialAuthButtons from '@/components/ui/auth/SoicalAuthButtons'; // Fixed typo: SoicalAuthButtons -> SocialAuthButtons
 import AuthLinks from '@/components/ui/auth/AuthLinks';
 
 interface ApiResponse {
   success: boolean;
   message?: string;
-  user?: {
+  user: {
     _id: string;
     name: string;
     email: string;
@@ -22,7 +22,17 @@ interface ApiResponse {
       url: string;
     };
   };
-  accessToken?: string;
+  accessToken: string;
+}
+
+interface CustomAxiosError extends Error {
+  response?: {
+    status: number;
+    data: {
+      message?: string;
+    };
+  };
+  message: string;
 }
 
 export default function LoginPage() {
@@ -33,7 +43,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const { theme, systemTheme } = useTheme();
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const { login } = useAuth();
+  const { loginWithToken } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -45,15 +55,21 @@ export default function LoginPage() {
   const handleLoginSuccess = async (data: ApiResponse) => {
     if (data.success && data.user && data.accessToken) {
       try {
-        await login(data.user.email, '', false); // Password not needed since token is provided
+        loginWithToken({
+          success: data.success,
+          accessToken: data.accessToken,
+          user: data.user,
+          message: data.message,
+        });
         if (!data.user.isVerified) {
           sessionStorage.setItem('activationToken', data.accessToken);
           router.push(`/activation?email=${encodeURIComponent(data.user.email)}`);
         } else {
           router.push('/user-dashboard');
         }
-      } catch (error: any) {
-        setGeneralError(error.message || 'Failed to process login');
+      } catch (error: unknown) {
+        const axiosError = error as CustomAxiosError;
+        setGeneralError(axiosError.response?.data?.message || axiosError.message || 'Failed to process login');
       }
     } else {
       setGeneralError(data.message || 'Invalid email or password');

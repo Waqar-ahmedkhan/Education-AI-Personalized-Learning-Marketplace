@@ -40,7 +40,7 @@ interface AuthContextType {
   isLoading: boolean;
   isTokenExpired: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string, isAdmin?: boolean) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   loginWithToken: (data: LoginResponse) => void;
   isAdmin: boolean;
@@ -103,14 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      await axios.get(`${baseUrl}/api/v1/validate-token`, {
+      await axios.get(`${baseUrl}/api/v1/user/refresh`, {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true,
       });
       setIsTokenExpired(false);
     } catch (error) {
       const axiosError = error as CustomAxiosError;
-      console.error('AuthProvider: Token validation error:', {
+      console.error('AuthProvider: Token refresh error:', {
         status: axiosError.response?.status,
         message: axiosError.message,
       });
@@ -132,63 +132,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserData = async () => {
     setIsLoading(true);
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-    const endpoints = ['/api/v1/admin/me', '/api/v1/user/me'];
-
-    for (const endpoint of endpoints) {
-      console.log(`AuthProvider: Attempting to fetch ${endpoint}`);
-      try {
-        const res = await axios.get<{ success: boolean; user: User }>(
-          `${baseUrl}${endpoint}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            withCredentials: true,
-          }
+    try {
+      console.log('AuthProvider: Attempting to fetch /api/v1/user/me');
+      const res = await axios.get<{ success: boolean; user: User }>(
+        `${baseUrl}/api/v1/user/me`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        }
+      );
+      console.log('AuthProvider: /api/v1/user/me response:', {
+        status: res.status,
+        success: res.data.success,
+        user: res.data.user,
+      });
+      if (res.data.success) {
+        setUserRole(res.data.user.role);
+        setUserName(res.data.user.name);
+        setUserAvatar(res.data.user.avatar || null);
+        sessionStorage.setItem(
+          'userData',
+          JSON.stringify({
+            role: res.data.user.role,
+            name: res.data.user.name,
+            avatar: res.data.user.avatar,
+          })
         );
-        console.log(`AuthProvider: ${endpoint} response:`, {
-          status: res.status,
-          success: res.data.success,
-          user: res.data.user,
-        });
-        if (res.data.success) {
-          setUserRole(res.data.user.role);
-          setUserName(res.data.user.name);
-          setUserAvatar(res.data.user.avatar || null);
-          sessionStorage.setItem(
-            'userData',
-            JSON.stringify({
-              role: res.data.user.role,
-              name: res.data.user.name,
-              avatar: res.data.user.avatar,
-            })
-          );
-          return;
-        }
-      } catch (error) {
-        const axiosError = error as CustomAxiosError<{ message?: string }>;
-        console.error(`AuthProvider: Error fetching ${endpoint}:`, {
-          status: axiosError.response?.status,
-          data: axiosError.response?.data,
-          message: axiosError.message,
-        });
-        if (axiosError.response?.status === 404 || axiosError.response?.status === 403) {
-          continue;
-        }
-        break;
+      } else {
+        console.log('AuthProvider: Failed to fetch user data, logging out');
+        logout();
       }
+    } catch (error) {
+      const axiosError = error as CustomAxiosError<{ message?: string }>;
+      console.error('AuthProvider: Error fetching /api/v1/user/me:', {
+        status: axiosError.response?.status,
+        data: axiosError.response?.data,
+        message: axiosError.message,
+      });
+      logout();
+    } finally {
+      setIsLoading(false);
     }
-    console.log('AuthProvider: All endpoints failed, logging out');
-    logout();
-    setIsLoading(false);
   };
 
-  const login = async (email: string, password: string, isAdmin: boolean = false) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const endpoint = isAdmin ? '/api/v1/admin/login' : '/api/v1/login';
-      console.log(`AuthProvider: Logging in via ${endpoint} with email: ${email}`);
+      console.log(`AuthProvider: Logging in via /api/v1/user/login with email: ${email}`);
       const res = await axios.post<LoginResponse>(
-        `${baseUrl}${endpoint}`,
+        `${baseUrl}/api/v1/user/login`,
         { email, password },
         {
           withCredentials: true,
@@ -206,9 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       loginWithToken(res.data);
-
-      console.log(`AuthProvider: Login successful, redirecting to ${res.data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard'}`);
-      router.push(res.data.user.role === 'admin' ? '/admin-dashboard' : '/user-dashboard');
+      console.log('AuthProvider: Login successful, redirecting to /user-dashboard');
+      router.push('/user-dashboard');
     } catch (error) {
       const axiosError = error as CustomAxiosError<{ message?: string }>;
       const status = axiosError.response?.status;
@@ -219,9 +211,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.error('AuthProvider: Login error:', { status, data: axiosError.response?.data, message });
 
-      if (status === 404) throw new Error('API endpoint not found');
+      if (status === 404) throw new Error('API endpoint not found. Check backend routes.');
       if (status === 401) throw new Error('Invalid email or password');
-      if (status === 403) throw new Error('Unauthorized: Admin access only');
+      if (status === 403) throw new Error('Unauthorized: Access denied');
       if (!axiosError.response) throw new Error('Network error: Unable to reach server');
       throw new Error(message);
     } finally {
@@ -235,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
       console.log('AuthProvider: Logging out, token:', token ? 'present' : 'null');
       if (token) {
-        await axios.get(`${baseUrl}/api/v1/logout`, {
+        await axios.get(`${baseUrl}/api/v1/user/logout`, {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
         });

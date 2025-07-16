@@ -35,7 +35,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetPassword = exports.forgetPassword = exports.createInitialAdmin = exports.createAdmin = exports.adminLogin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getAdminInfo = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.validateToken = exports.resetPassword = exports.forgetPassword = exports.createInitialAdmin = exports.createAdmin = exports.adminLogin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getAdminInfo = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -1011,3 +1011,22 @@ exports.resetPassword = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) 
         return next(new AppError_1.AppError("An error occurred while resetting your password. Please try again.", 500));
     }
 }));
+const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split('Bearer ')[1];
+        if (!token) {
+            return res.status(401).json({ success: false, message: 'No token provided' });
+        }
+        // Check if token exists in Redis
+        const session = yield RedisConnect_1.client.get(`session:${token}`);
+        if (!session) {
+            return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+        }
+        res.status(200).json({ success: true, message: 'Token is valid' });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+exports.validateToken = validateToken;

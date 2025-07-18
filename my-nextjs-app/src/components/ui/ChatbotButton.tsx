@@ -1,6 +1,8 @@
-"use client"
+
+"use client";
+
 import { useState, useEffect, useRef } from "react";
-import { SendHorizonal, X,  BookOpen, Sparkles, MessageCircle, Zap, Globe, Heart } from "lucide-react";
+import { SendHorizonal, X, BookOpen, Sparkles, MessageCircle, Zap, Globe, Heart } from "lucide-react";
 
 // Define interfaces for type safety
 interface Message {
@@ -205,18 +207,18 @@ const ChatbotButton: React.FC = () => {
             
             {/* Enhanced Click Me Tooltip */}
             {showClickMe && (
-              <div className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 z-10">
+              <div className="absolute bottom-full mb-3 right-1/2 transform -trans right-1/2/2 z-10">
                 <div className="relative bg-gradient-to-r from-gray-900 to-gray-800 text-white px-4 py-3 rounded-2xl shadow-2xl border border-gray-700 min-w-max">
                   <div className="flex items-center gap-2 font-medium text-sm">
                     <MessageCircle className="w-4 h-4 text-emerald-400" />
                     <span>Click me for help! 🎯</span>
                   </div>
-                  <div className="text-xs text-gray-300 mt-1">
+                  <div className="text-xs text-gray- right-1/2">
                     MDCAT • NET • ECAT • Board Exams
                   </div>
                   
                   {/* Tooltip Arrow */}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2">
+                  <div className="absolute top-full right-0 transform -translate-x-1/2">
                     <div className="w-3 h-3 bg-gradient-to-br from-gray-900 to-gray-800 rotate-45 border-r border-b border-gray-700"></div>
                   </div>
                   
@@ -234,7 +236,7 @@ const ChatbotButton: React.FC = () => {
         {open && (
           <div className="bg-white/95 backdrop-blur-xl dark:bg-gray-950/95 shadow-2xl rounded-2xl md:rounded-3xl w-[100vw] h-[100vh] md:w-[480px] md:max-w-[95vw] md:h-[680px] flex flex-col transition-all duration-500 ease-out animate-in slide-in-from-bottom-4 md:slide-in-from-right-4">
             {/* Header */}
-            <div className="flex justify-between items-center p-4 md:p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-t-2xl md:rounded-t-3xl">
+            <div className="flex justify-between items-center p-6 md:p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-t-2xl md:rounded-t-3xl pl-4">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <div className={`p-2 rounded-xl bg-gradient-to-r ${currentTone.color} text-white shadow-lg`}>
@@ -342,6 +344,8 @@ const ChatbotButton: React.FC = () => {
               ref={chatContainerRef}
               className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 scroll-smooth"
               style={{ 
+                maxHeight: '6vh',
+                overflowX: 'hidden',
                 scrollbarWidth: 'thin',
                 scrollbarColor: '#10b981 #f3f4f6'
               }}

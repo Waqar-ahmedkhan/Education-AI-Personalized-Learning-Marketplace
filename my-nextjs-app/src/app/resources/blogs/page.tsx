@@ -5,30 +5,18 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-interface Project {
+interface Blog {
   title: string;
-  description: string;
-  stars: number;
+  excerpt: string;
+  date: string;
 }
 
 const Page = () => {
-  const [projects] = useState<Project[]>([
-    {
-      title: "All Functional MERN Stack LMS Learning Management system series with next 13, TypeScript | Full Course",
-      description: "A comprehensive learning management system built with MERN stack.",
-      stars: 4300,
-    },
-    {
-      title: "Multi-Vendor MERN Stack E-commerce project With All functionalities absolutely for beginners",
-      description: "An e-commerce solution for beginners using MERN stack.",
-      stars: 400,
-    },
+  const [blogs] = useState<Blog[]>([
+    { title: "Introduction to MERN Stack", excerpt: "A beginner's guide to building with MERN, updated as of July 18, 2025.", date: "Jul 15, 2025" },
+    { title: "Optimizing React Performance", excerpt: "Tips for improving React app performance, reviewed at 10:29 AM PKT today.", date: "Jul 10, 2025" },
+    { title: "Advanced AI Techniques", excerpt: "Exploring cutting-edge AI methods for developers, released July 2025.", date: "Jul 12, 2025" },
   ]);
-
-  const community = [
-    { name: "John Doe", role: "Developer" },
-    { name: "Jane Smith", role: "Designer" },
-  ];
 
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -77,29 +65,23 @@ const Page = () => {
         </div>
       </nav>
       <div className="w-full max-w-4xl mb-6 sm:mb-12">
-        <h2 className={`text-2xl sm:text-3xl font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Source Code</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {projects.map((project) => (
-            <div
-              key={project.title}
-              className={`p-4 sm:p-6 rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 ${isDarkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-700" : "bg-white border-gray-200 hover:bg-gray-100"} border`}
-            >
-              <h3 className={`text-lg sm:text-xl font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{project.title}</h3>
-              <p className={`mt-1 sm:mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"} text-sm sm:text-base`}>{project.description}</p>
-              <span className={`mt-2 sm:mt-4 inline-block ${isDarkMode ? "text-green-400" : "text-green-600"} text-sm sm:text-base`}>{project.stars} ★</span>
-            </div>
-          ))}
-        </div>
+        <h1 className={`text-2xl sm:text-4xl font-bold mb-4 ${isDarkMode ? "bg-gradient-to-r from-purple-300 to-indigo-400 bg-clip-text text-transparent" : "bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent"}`}>
+          Blog Articles
+        </h1>
+        <p className={`text-sm sm:text-lg ${isDarkMode ? "text-gray-300" : "text-gray-600"} max-w-xs sm:max-w-xl mx-auto leading-relaxed mb-6 sm:mb-12`}>
+          Explore the latest insights and tutorials from our experts, updated regularly as of July 18, 2025.
+        </p>
       </div>
-      <div className="w-full max-w-4xl mb-6 sm:mb-12">
-        <h2 className={`text-2xl sm:text-3xl font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}>Community</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          {community.map((member) => (
+      <div className="w-full max-w-4xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {blogs.map((blog) => (
             <div
-              key={member.name}
-              className={`p-4 sm:p-6 rounded-xl shadow-lg ${isDarkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-700" : "bg-white border-gray-200 hover:bg-gray-100"} border`}
+              key={blog.title}
+              className={`p-4 sm:p-6 rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 ${isDarkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-700" : "bg-white border-gray-200 hover:bg-gray-50"} border`}
             >
-              <p className={`text-lg sm:text-xl ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{member.name} - {member.role}</p>
+              <h3 className={`text-lg sm:text-xl font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{blog.title}</h3>
+              <p className={`mt-1 sm:mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"} text-sm sm:text-base`}>{blog.excerpt}</p>
+              <span className={`mt-2 sm:mt-4 inline-block ${isDarkMode ? "text-gray-400" : "text-gray-600"} text-xs sm:text-sm`}>{blog.date}</span>
             </div>
           ))}
         </div>

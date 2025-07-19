@@ -10,22 +10,29 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllOrdersService = exports.newOrder = void 0;
-const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const Order_model_1 = require("../models/Order.model");
-// create new order
-exports.newOrder = (0, CatchAsyncError_1.CatchAsyncError)((data, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const order = yield Order_model_1.OrderModel.create(data);
-    res.status(201).json({
-        succcess: true,
-        order,
-    });
-}));
-// Get All Orders
+const AppError_1 = require("../utils/AppError");
+const newOrder = (data, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const order = yield Order_model_1.OrderModel.create(data);
+        return order;
+    }
+    catch (error) {
+        next(new AppError_1.AppError(error.message, 500));
+        return undefined;
+    }
+});
+exports.newOrder = newOrder;
 const getAllOrdersService = (res) => __awaiter(void 0, void 0, void 0, function* () {
-    const orders = yield Order_model_1.OrderModel.find().sort({ createdAt: -1 });
-    res.status(201).json({
-        success: true,
-        orders,
-    });
+    try {
+        const orders = yield Order_model_1.OrderModel.find().sort({ createdAt: -1 });
+        res.status(200).json({
+            success: true,
+            orders,
+        });
+    }
+    catch (error) {
+        throw new AppError_1.AppError(error.message, 500);
+    }
 });
 exports.getAllOrdersService = getAllOrdersService;

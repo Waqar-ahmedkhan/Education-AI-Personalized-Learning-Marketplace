@@ -6,7 +6,7 @@ import {
   CreateCourse,
   getallCoursesServices,
 } from "../services/course.services";
-import CourseModel from "../models/Course.model";
+import CourseModel, { ICourse } from "../models/Course.model";
 import Redis from "ioredis";
 import { client } from "../utils/RedisConnect";
 import ejs from "ejs";
@@ -18,6 +18,8 @@ import sendEmail from "../utils/Sendemail";
 import axios from "axios";
 import { NotificaModel } from "../models/Notification.model";
 import { getalluserServices } from "../services/user.services";
+import UserModel from "../models/user.model";
+import { Types } from "mongoose";
 
 export const uploadCourse = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -192,6 +194,8 @@ export const getCoursesbyUser = CatchAsyncError(
     }
   }
 );
+
+
 
 // add question to the courses
 
@@ -678,6 +682,87 @@ export const generateVideoUrl = CatchAsyncError(
       res.json(response.data);
     } catch (error: any) {
       return next(new AppError(error.message, 400));
+    }
+  }
+);
+
+
+export const getUserPurchasedCourses = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user?._id;
+      if (!userId) return next(new AppError("User not authenticated", 401));
+
+      const cacheKey = `purchased_courses_${userId}`;
+      const cachedCourses = await client.get(cacheKey);
+      if (cachedCourses) {
+        console.log(`Hitting Redis cache for purchased courses: ${userId}`);
+        return res.status(200).json({
+          success: true,
+          data: JSON.parse(cachedCourses),
+        });
+      }
+
+      console.log(`Cache miss for purchased courses: ${userId}`);
+      const user = await UserModel.findById(userId).select("courses courseProgress");
+      if (!user) return next(new AppError("User not found", 404));
+
+      const purchasedCourseIds = user.courses.map((course: any) => course.courseId);
+
+      if (purchasedCourseIds.length === 0) {
+        const emptyResponse = {
+          success: true,
+          data: [],
+          message: "No courses purchased",
+        };
+        await client.set(cacheKey, JSON.stringify(emptyResponse.data), { EX: 604800 });
+        return res.status(200).json(emptyResponse);
+      }
+
+      const courses = await CourseModel.find({
+        _id: { $in: purchasedCourseIds },
+      }).select(
+        "name description thumbnail category instructor rating purchased duration courseData"
+      );
+
+      const coursesWithProgress = courses.map((courseDoc) => {
+        const course = courseDoc.toObject() as ICourse & { _id: Types.ObjectId };
+        const progressData = user.courseProgress.find(
+          (p: any) => String(p.courseId) === String(course._id)
+        );
+
+        return {
+          ...course,
+          progress: progressData
+            ? {
+                percentage: progressData.progress,
+                completedLessons: progressData.completedLessons.length,
+                totalLessons: course.courseData.length,
+                lastAccessed: progressData.lastAccessed,
+              }
+            : {
+                percentage: 0,
+                completedLessons: 0,
+                totalLessons: course.courseData.length,
+                lastAccessed: null,
+              },
+        };
+      });
+
+      // Cache individual purchase statuses
+      for (const course of coursesWithProgress) {
+        await client.set(`purchase:${userId}:${course._id}`, "true", { EX: 604800 });
+      }
+      await client.set(cacheKey, JSON.stringify(coursesWithProgress), { EX: 604800 });
+      console.log(`Cached purchased courses for user ${userId}`);
+
+      return res.status(200).json({
+        success: true,
+        data: coursesWithProgress,
+      });
+    } catch (err) {
+      console.error("getUserPurchasedCourses error:", err);
+      return next(new AppError("Failed to fetch purchased courses", 500));
     }
   }
 );

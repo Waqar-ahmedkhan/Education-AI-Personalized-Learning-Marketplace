@@ -1,13 +1,21 @@
-// src/types/course.ts
-
-// ✅ Replaced all `any` with proper, extensible types.
-// You can adjust `Question`, `Resource`, `Quiz`, and `Review` types based on your actual data structure.
 
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
-  course?: T; // To match API returning { course: {...} }
+  course?: T;
   message?: string;
+}
+
+export interface User {
+  _id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+}
+
+export interface CourseThumbnail {
+  public_id: string;
+  url: string;
 }
 
 export interface CourseInstructor {
@@ -16,35 +24,44 @@ export interface CourseInstructor {
   avatar: string;
 }
 
-export interface CourseThumbnail {
-  public_id: string;
-  url: string;
-}
-
-export interface Question {
-  questionText: string;
-  options: string[];
-  correctAnswer: string;
-}
-
 export interface Resource {
   title: string;
   url: string;
   type: 'pdf' | 'link' | 'doc' | 'image' | 'video';
 }
 
+export interface Question {
+  _id?: string;
+  questionText: string;
+  options: string[];
+  correctAnswer: string;
+}
+
 export interface Quiz {
+  _id?: string;
   title: string;
   questions: Question[];
   passingScore: number;
+  timeLimit?: number;
+}
+
+export interface Comment {
+  _id?: string;
+  user: User;
+  question: string;
+  questionReplies?: { _id?: string; user: User; answer: string; createdAt: string }[];
+  createdAt: string;
+  starred?: boolean;
 }
 
 export interface Review {
+  _id?: string;
   userId: string;
   name: string;
   rating: number;
   comment: string;
   createdAt: string;
+  CommentReplies?: { _id?: string; user: User; comment: string; createdAt: string }[];
 }
 
 export interface CourseData {
@@ -57,16 +74,27 @@ export interface CourseData {
   videoSection?: string;
   videoLength?: number;
   videoPlayer?: string;
-  question?: Question[];
-  additionalResources?: Resource[];
+  question?: Comment[];
   quizzes?: Quiz[];
+  additionalResources?: Resource[];
   completed?: boolean;
 }
 
-export interface CompletionCriteria {
-  requiredLessons: boolean;
-  requiredQuizzes: boolean;
-  minimumScore: number;
+export interface Progress {
+  user: string;
+  contentId: string;
+}
+
+export interface Certificate {
+  user: string;
+  issuedAt: string;
+  certificateId: string;
+}
+
+export interface Gamification {
+  user: string;
+  xp: number;
+  badges: string[];
 }
 
 export interface Course {
@@ -86,12 +114,18 @@ export interface Course {
   lectures?: number;
   courseData?: CourseData[];
   enrolled?: boolean;
-  progress?: number;
+  progress?: Progress[];
+  certificates?: Certificate[];
+  gamification?: Gamification[];
   bio?: string;
   curriculum?: string[];
   createdAt?: string;
   updatedAt?: string;
-  completionCriteria?: CompletionCriteria;
+  completionCriteria?: {
+    requiredLessons: boolean;
+    requiredQuizzes: boolean;
+    minimumScore: number;
+  };
   estimatedPrice?: number;
   demoUrl?: string;
   topics?: string[];

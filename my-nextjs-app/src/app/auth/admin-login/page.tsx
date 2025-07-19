@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
 
     try {
       console.log('Attempting admin login with email:', email);
-      await login(email, password, true); // Pass isAdmin: true
+      await login(email, password,); // Pass isAdmin: true
       console.log('Login successful, redirecting to /admin-dashboard');
     } catch (error: unknown) {
       const axiosError = error as { message?: string; response?: { status?: number; data?: unknown } };

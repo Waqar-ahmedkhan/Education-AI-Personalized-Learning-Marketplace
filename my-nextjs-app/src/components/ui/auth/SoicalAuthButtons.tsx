@@ -1,8 +1,7 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback } from 'react';
-import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-import axios from 'axios';
 
 interface Props {
   setGeneralError: (error: string | null) => void;
@@ -10,77 +9,22 @@ interface Props {
   setIsLoading: (loading: boolean) => void;
 }
 
-interface ApiResponse {
-  success: boolean;
-  message?: string;
-  user?: {
-    _id: string;
-    name: string;
-    email: string;
-    role: string;
-    isVerified: boolean;
-  };
-  accessToken?: string;
-}
+export default function SocialAuthButtons({ setGeneralError, isLoading, setIsLoading }: Props) {
+  const handleGoogleAuth = useCallback(() => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setGeneralError(null);
 
-export default function SocialAuthButtons({
-  setGeneralError,
-  isLoading,
-  setIsLoading,
-}: Props) {
-  const handleGoogleAuth = useCallback(
-    async (credentialResponse: CredentialResponse) => {
-      if (!credentialResponse?.credential) {
-        setGeneralError('Missing Google credential');
-        return;
-      }
-
-      if (isLoading) return;
-      setIsLoading(true);
-      setGeneralError(null);
-
-      try {
-        const response = await axios.post<ApiResponse>(
-          'http://localhost:8080/api/v1/user/social-auth',
-          {
-            provider: 'google',
-            token: credentialResponse.credential,
-          },
-          { withCredentials: true }
-        );
-
-        const { success, user, accessToken, message } = response.data;
-
-        if (success && user && accessToken) {
-          sessionStorage.setItem(
-            'userData',
-            JSON.stringify({
-              _id: user._id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-            })
-          );
-          sessionStorage.setItem('accessToken', accessToken);
-
-          // Optional: redirect based on role
-          if (user.role === 'admin') {
-            window.location.href = '/admin-dashboard';
-          } else {
-            window.location.href = '/user-dashboard';
-          }
-        } else {
-          setGeneralError(message || 'Google login failed.');
-        }
-      } catch (error: unknown) {
-        console.error('Google Auth Failed:', error);
-        
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [isLoading, setGeneralError, setIsLoading]
-  );
+    try {
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile`;
+      window.location.href = googleAuthUrl;
+    } catch (error) {
+      console.error('Google Auth Failed:', error);
+      setGeneralError('Failed to initiate Google login');
+      setIsLoading(false);
+    }
+  }, [isLoading, setGeneralError, setIsLoading]);
 
   return (
     <div className="mt-6">
@@ -95,21 +39,18 @@ export default function SocialAuthButtons({
         </div>
       </div>
 
-      <div className="relative mt-4 w-fit">
+      <div className="relative mt-4 w-fit mx-auto">
         {isLoading && (
           <div className="absolute inset-0 z-10 bg-white/50 dark:bg-black/30 cursor-not-allowed rounded-md" />
         )}
-
-        <GoogleLogin
-          onSuccess={handleGoogleAuth}
-          onError={() => {
-            setGeneralError('Google login failed.');
-            setIsLoading(false);
-          }}
-          text="signin_with"
-          shape="rectangular"
-          width="300"
-        />
+        <button
+          onClick={handleGoogleAuth}
+          disabled={isLoading}
+          className="w-full flex items-center justify-center px-4 py-2 border rounded-lg bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+        >
+          <Image src="/google-icon.svg" width={40} height={40} alt="Google" className="w-5 h-5 mr-2" />
+          Sign in with Google
+        </button>
       </div>
     </div>
   );

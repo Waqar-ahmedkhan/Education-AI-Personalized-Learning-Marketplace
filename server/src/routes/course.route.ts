@@ -14,6 +14,7 @@ import {
   generateCertificate,
   addGamificationXP,
   downloadCertificatePDF,
+  getUserPurchasedCourses,
 } from "../Controllers/course.controller";
 import { isAdmin, isAuthenticated, isUser } from "../middlewares/auth";
 
@@ -21,7 +22,7 @@ const courseRouter = express.Router();
 
 courseRouter.get("/get-course/:id", GetSingleCourse);
 courseRouter.get("/get-courses", getallCourses);
-courseRouter.get("/get-course-content/:id", isAuthenticated, isUser, getCoursesbyUser);
+courseRouter.get("/get-course-content/:id", getCoursesbyUser);
 courseRouter.put("/add-question", isAuthenticated, isUser, addQuestion);
 courseRouter.put("/add-answer", isAuthenticated, isUser, addAnswer);
 courseRouter.put("/add-review/:id", isAuthenticated, isUser, addReview);
@@ -34,5 +35,11 @@ courseRouter.post("/track-progress", isAuthenticated, isUser, trackProgress);
 courseRouter.post("/generate-certificate/:id", isAuthenticated, isUser, generateCertificate);
 courseRouter.post("/add-xp", isAuthenticated, isUser, addGamificationXP);
 courseRouter.get("/download-certificate/:id", isAuthenticated, isUser, downloadCertificatePDF);
+courseRouter.get(
+  "/get-purchased-courses",
+  isAuthenticated,
+  isUser,
+  getUserPurchasedCourses
+);
 
 export default courseRouter;

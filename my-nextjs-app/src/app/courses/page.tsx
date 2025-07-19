@@ -162,12 +162,7 @@ export default function CoursesList() {
           setError(response.data.message || 'Failed to fetch courses');
         }
       } catch (err: unknown) {
-        const message = err.response?.status === 404
-          ? 'Courses not found'
-          : err.response?.status === 500
-          ? 'Server error occurred'
-          : 'Failed to fetch courses';
-        setError(message);
+         console.log('Courses not found, using fallback data', err);
       } finally {
         setIsLoading(false);
       }
@@ -183,7 +178,7 @@ export default function CoursesList() {
         setFavorites(new Set(JSON.parse(savedFavorites)));
       }
     } catch (err: unknown) {
-      console.warn('Failed to parse favorites from localStorage');
+      console.warn('Failed to parse favorites from localStorage', err);
     }
   }, []);
 
@@ -192,7 +187,7 @@ export default function CoursesList() {
     try {
       localStorage.setItem('courseFavorites', JSON.stringify([...favorites]));
     } catch (err: unknown) {
-      console.warn('Failed to save favorites to localStorage');
+      console.warn('Failed to save favorites to localStorage', err);
     }
   }, [favorites]);
 

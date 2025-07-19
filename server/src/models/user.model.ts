@@ -1,4 +1,3 @@
-// models/user.model.ts
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import mongoose, { Schema, Document, Model } from "mongoose";
@@ -6,6 +5,7 @@ import * as crypto from "crypto";
 import "dotenv/config";
 
 export interface IUser extends Document {
+  _id: mongoose.Types.ObjectId;
   name: string;
   email: string;
   password?: string; // Made optional for social auth

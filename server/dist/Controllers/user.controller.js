@@ -35,7 +35,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateToken = exports.resetPassword = exports.forgetPassword = exports.createInitialAdmin = exports.createAdmin = exports.adminLogin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getAdminInfo = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
+exports.resetPassword = exports.forgetPassword = exports.createInitialAdmin = exports.createAdmin = exports.adminLogin = exports.deleteUser = exports.updateUserRoles = exports.getallUsers = exports.UpdateProfilePicture = exports.UpdatePassword = exports.UpdateUserInformation = exports.socialAuth = exports.getAdminInfo = exports.getUserInformatin = exports.updateAccessToken = exports.UserLogout = exports.UserLogin = exports.activateUser = exports.registerUser = exports.createActivationToken = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const AppError_1 = require("../utils/AppError");
@@ -48,6 +48,7 @@ const cloudinary_1 = __importDefault(require("cloudinary"));
 const crypto = __importStar(require("crypto"));
 const google_auth_library_1 = require("google-auth-library");
 const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleapis_1 = require("googleapis");
 const createActivationToken = (user) => {
     if (!process.env.ACTIVATION_SECRET) {
         throw new Error("ACTIVATION_SECRET is not defined in environment variables");
@@ -489,47 +490,47 @@ exports.updateAccessToken = (0, CatchAsyncError_1.CatchAsyncError)((req, res, ne
     try {
         const refresh_token = req.cookies.refresh_token;
         if (!refresh_token) {
-            return next(new AppError_1.AppError("Please login again", 401));
+            return next(new AppError_1.AppError('Please login again', 401));
         }
-        // Verify refresh token
         let decoded;
         try {
             decoded = jsonwebtoken_1.default.verify(refresh_token, process.env.REFRESH_TOKEN_SECRET);
         }
         catch (error) {
-            if (error.name === "TokenExpiredError") {
-                return next(new AppError_1.AppError("Refresh token expired, please login again", 401));
-            }
-            return next(new AppError_1.AppError("Invalid refresh token", 401));
+            return next(new AppError_1.AppError(error.name === 'TokenExpiredError'
+                ? 'Refresh token expired, please login again'
+                : 'Invalid refresh token', 401));
         }
-        // Get user from Redis
-        const session = yield RedisConnect_1.client.get(decoded.id);
-        if (!session) {
-            return next(new AppError_1.AppError("Please login again", 401));
+        let user = yield RedisConnect_1.client.get(decoded.id);
+        if (!user) {
+            const dbUser = yield user_model_1.default.findById(decoded.id).select('name email role isVerified courses courseProgress');
+            if (!dbUser)
+                return next(new AppError_1.AppError('User not found', 401));
+            user = JSON.stringify(dbUser);
+            yield RedisConnect_1.client.set(decoded.id, user, { EX: 7 * 24 * 60 * 60 });
         }
-        const user = JSON.parse(session);
-        // Generate new access token
-        const access_token = jsonwebtoken_1.default.sign({ id: user._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "8m" } // Set according to your environment variable
-        );
-        // Generate new refresh token
-        const new_refresh_token = jsonwebtoken_1.default.sign({ id: user._id }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "4d" } // Set according to your environment variable
-        );
-        // Update session in Redis
-        user.refresh_token = new_refresh_token; // Update refresh token
-        yield RedisConnect_1.client.set(user._id, JSON.stringify(user));
-        req.user = user;
-        // Set new cookies
-        res.cookie("access_token", access_token, jwt_1.accessTokenOptions);
-        res.cookie("refresh_token", new_refresh_token, jwt_1.refreshTokenOptions);
-        yield RedisConnect_1.client.set(user._id, JSON.stringify(user), { EX: 6048000 });
+        const parsedUser = JSON.parse(user);
+        const access_token = jsonwebtoken_1.default.sign({ id: parsedUser._id, role: parsedUser.role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: process.env.ACCESS_TOKEN_EXPIRE || '70m' });
+        const new_refresh_token = jsonwebtoken_1.default.sign({ id: parsedUser._id, role: parsedUser.role }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRE || '90m' });
+        res.cookie('access_token', access_token, jwt_1.accessTokenOptions);
+        res.cookie('refresh_token', new_refresh_token, jwt_1.refreshTokenOptions);
+        yield RedisConnect_1.client.set(parsedUser._id, JSON.stringify(Object.assign(Object.assign({}, parsedUser), { refresh_token: new_refresh_token })), { EX: 7 * 24 * 60 * 60 });
         res.status(200).json({
-            status: "success",
-            access_token,
+            success: true,
+            accessToken: access_token,
+            user: {
+                _id: parsedUser._id,
+                name: parsedUser.name,
+                email: parsedUser.email,
+                role: parsedUser.role,
+                isVerified: parsedUser.isVerified,
+                avatar: parsedUser.avatar,
+            },
         });
     }
     catch (error) {
-        console.error("Token refresh error:", error);
-        return next(new AppError_1.AppError("Error refreshing access token", 500));
+        console.error('Token refresh error:', error);
+        return next(new AppError_1.AppError('Error refreshing access token', 500));
     }
 }));
 const getUserInformatin = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -579,26 +580,39 @@ exports.getAdminInfo = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) =
 }));
 exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { token } = req.body;
-        if (!token) {
-            return next(new AppError_1.AppError('Google ID token is required', 400));
+        const { provider, code } = req.body;
+        if (provider !== 'google' || !code) {
+            return next(new AppError_1.AppError('Google provider and code are required', 400));
+        }
+        const oauth2Client = new googleapis_1.google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, `${process.env.FRONTEND_URL}/auth/callback`);
+        let tokenResponse;
+        try {
+            tokenResponse = yield oauth2Client.getToken(code);
+        }
+        catch (error) {
+            console.error('Google code exchange error:', error);
+            return next(new AppError_1.AppError('Invalid or expired Google code', 401));
+        }
+        const { id_token } = tokenResponse.tokens;
+        if (!id_token) {
+            return next(new AppError_1.AppError('Missing ID token from Google', 401));
         }
         let ticket;
         try {
-            ticket = yield googleClient.verifyIdToken({
-                idToken: token,
+            ticket = yield oauth2Client.verifyIdToken({
+                idToken: id_token,
                 audience: process.env.GOOGLE_CLIENT_ID,
             });
         }
         catch (error) {
             console.error('Google token verification error:', error);
-            return next(new AppError_1.AppError('Invalid or expired Google ID token', 401));
+            return next(new AppError_1.AppError('Invalid Google ID token', 401));
         }
         const payload = ticket.getPayload();
         if (!payload) {
             return next(new AppError_1.AppError('Invalid Google token payload', 401));
         }
-        const { email, name, picture } = payload;
+        const { email, name, picture, sub } = payload;
         if (!email || !name) {
             return next(new AppError_1.AppError('Email and name are required from Google profile', 400));
         }
@@ -608,11 +622,9 @@ exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
             user = yield user_model_1.default.create({
                 name: name.trim(),
                 email: normalizedEmail,
-                avatar: picture
-                    ? { public_id: `google_${payload.sub}`, url: picture }
-                    : undefined,
+                avatar: picture ? { public_id: `google_${sub}`, url: picture } : undefined,
                 isVerified: true,
-                role: 'user', // Explicitly set to user
+                role: 'user',
                 socialAuthProvider: 'google',
                 courses: [],
                 preferences: [],
@@ -620,17 +632,16 @@ exports.socialAuth = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
                 courseProgress: [],
                 interactionHistory: [],
             });
-            console.log(`New Google user created: ${normalizedEmail}`);
+            console.log(`✅ New Google user created: ${normalizedEmail}`);
         }
         else if (user.socialAuthProvider !== 'google') {
-            return next(new AppError_1.AppError('Account exists with different provider', 400));
+            return next(new AppError_1.AppError('Account exists with a different provider', 400));
         }
-        // Use sendToken to set cookies and return response
         return yield (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (err) {
-        console.error('Google social auth error:', err);
-        return next(new AppError_1.AppError(err.message || 'Error during Google authentication', 500));
+        console.error('❌ Google social auth error:', err);
+        return next(new AppError_1.AppError(err.message || 'Google auth failed', 500));
     }
 }));
 exports.UpdateUserInformation = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -796,7 +807,7 @@ exports.adminLogin = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => 
             return next(new AppError_1.AppError("Incorrect email or password", 401));
         }
         console.log("Calling sendToken for user:", user._id);
-        (0, jwt_1.sendToken)(user, 200, res);
+        return (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (err) {
         console.error("Error in admin login:", err.message, err.stack);
@@ -1011,22 +1022,19 @@ exports.resetPassword = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) 
         return next(new AppError_1.AppError("An error occurred while resetting your password. Please try again.", 500));
     }
 }));
-const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    try {
-        const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split('Bearer ')[1];
-        if (!token) {
-            return res.status(401).json({ success: false, message: 'No token provided' });
-        }
-        // Check if token exists in Redis
-        const session = yield RedisConnect_1.client.get(`session:${token}`);
-        if (!session) {
-            return res.status(401).json({ success: false, message: 'Invalid or expired token' });
-        }
-        res.status(200).json({ success: true, message: 'Token is valid' });
-    }
-    catch (error) {
-        next(error);
-    }
-});
-exports.validateToken = validateToken;
+// export const validateToken = async (req: Request, res: Response, next: NextFunction) => {
+//   try {
+//     const token = req.headers.authorization?.split('Bearer ')[1];
+//     if (!token) {
+//       return res.status(401).json({ success: false, message: 'No token provided' });
+//     }
+//     // Check if token exists in Redis
+//     const session = await client.get(`session:${token}`);
+//     if (!session) {
+//       return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+//     }
+//     res.status(200).json({ success: true, message: 'Token is valid' });
+//   } catch (error) {
+//     next(error);
+//   }
+// };

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateVideoUrl = exports.downloadCertificatePDF = exports.deleteCourse = exports.getAdminAllCourses = exports.addReplyToReview = exports.addGamificationXP = exports.generateCertificate = exports.trackProgress = exports.addReview = exports.addAnswer = exports.addQuestion = exports.getCoursesbyUser = exports.getallCourses = exports.GetSingleCourse = exports.editCourse = exports.uploadCourse = void 0;
+exports.getUserPurchasedCourses = exports.generateVideoUrl = exports.downloadCertificatePDF = exports.deleteCourse = exports.getAdminAllCourses = exports.addReplyToReview = exports.addGamificationXP = exports.generateCertificate = exports.trackProgress = exports.addReview = exports.addAnswer = exports.addQuestion = exports.getCoursesbyUser = exports.getallCourses = exports.GetSingleCourse = exports.editCourse = exports.uploadCourse = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const AppError_1 = require("../utils/AppError");
 const cloudinary_1 = __importDefault(require("cloudinary"));
@@ -28,6 +28,7 @@ const Sendemail_1 = __importDefault(require("../utils/Sendemail"));
 const axios_1 = __importDefault(require("axios"));
 const Notification_model_1 = require("../models/Notification.model");
 const user_services_1 = require("../services/user.services");
+const user_model_1 = __importDefault(require("../models/user.model"));
 exports.uploadCourse = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log("Received course data:", JSON.stringify(req.body, null, 2));
@@ -504,5 +505,65 @@ exports.generateVideoUrl = (0, CatchAsyncError_1.CatchAsyncError)((req, res, nex
     }
     catch (error) {
         return next(new AppError_1.AppError(error.message, 400));
+    }
+}));
+exports.getUserPurchasedCourses = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        if (!userId)
+            return next(new AppError_1.AppError("User not authenticated", 401));
+        // Check Redis cache
+        const cacheKey = `purchased_courses_${userId}`;
+        const cachedCourses = yield RedisConnect_1.client.get(cacheKey);
+        if (cachedCourses) {
+            console.log("Hitting Redis cache for purchased courses");
+            return res.status(200).json({
+                success: true,
+                data: JSON.parse(cachedCourses),
+            });
+        }
+        // Fetch user with courses and progress
+        const user = yield user_model_1.default.findById(userId).select("courses courseProgress");
+        if (!user)
+            return next(new AppError_1.AppError("User not found", 404));
+        const purchasedCourseIds = user.courses.map((course) => course.courseId);
+        if (purchasedCourseIds.length === 0) {
+            return res.status(200).json({
+                success: true,
+                data: [],
+                message: "No courses purchased",
+            });
+        }
+        const courses = yield Course_model_1.default.find({
+            _id: { $in: purchasedCourseIds },
+        }).select("name description thumbnail category instructor rating purchased duration courseData");
+        // 🔧 Ensure TypeScript knows the type of `course`
+        const coursesWithProgress = courses.map((courseDoc) => {
+            const course = courseDoc.toObject(); // 👈 fix type here
+            const progressData = user.courseProgress.find((p) => p.courseId.toString() === course._id.toString());
+            return Object.assign(Object.assign({}, course), { progress: progressData
+                    ? {
+                        percentage: progressData.progress,
+                        completedLessons: progressData.completedLessons.length,
+                        totalLessons: course.courseData.length,
+                        lastAccessed: progressData.lastAccessed,
+                    }
+                    : {
+                        percentage: 0,
+                        completedLessons: 0,
+                        totalLessons: course.courseData.length,
+                        lastAccessed: null,
+                    } });
+        });
+        yield RedisConnect_1.client.set(cacheKey, JSON.stringify(coursesWithProgress), { EX: 604800 });
+        res.status(200).json({
+            success: true,
+            data: coursesWithProgress,
+        });
+    }
+    catch (err) {
+        console.error("getUserPurchasedCourses error:", err);
+        next(new AppError_1.AppError("Failed to fetch purchased courses", 500));
     }
 }));

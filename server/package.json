@@ -25,6 +25,7 @@
     "@types/ejs": "^3.1.5",
     "@types/nodemailer": "^6.4.16",
     "@types/redis": "^4.0.10",
+    "@types/stripe": "^8.0.417",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
@@ -35,6 +36,7 @@
     "express": "^4.21.1",
     "express-rate-limit": "^7.5.1",
     "google-auth-library": "^10.1.0",
+    "googleapis": "^153.0.0",
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.7.2",
@@ -43,6 +45,7 @@
     "pdfkit": "^0.17.0",
     "redis": "^4.7.0",
     "stripe": "^17.7.0",
+    "uuid": "^11.1.0",
     "zod": "^3.25.74"
   }
 }

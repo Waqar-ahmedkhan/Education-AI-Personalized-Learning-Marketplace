@@ -288,7 +288,7 @@ export default function CourseContent(): React.JSX.Element {
       setError(null);
 
       // Fetch course details
-      const courseResponse = await axios.get<ApiResponse<Course>>(`${baseUrl}/api/v1/get-course/${courseId}`);
+      const courseResponse = await axios.get<ApiResponse<Course>>(`${baseUrl}/api/v1/get-course-content/${courseId}`);
       if (!courseResponse.data.success) {
         throw new Error(courseResponse.data.message || 'Failed to fetch course');
       }

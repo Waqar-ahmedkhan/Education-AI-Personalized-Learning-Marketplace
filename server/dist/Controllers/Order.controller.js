@@ -12,138 +12,150 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.newPayment = exports.sendStripePublishableKey = exports.getAllOrders = exports.createOrder = void 0;
+exports.checkPurchase = exports.sendStripePublishableKey = exports.getAllOrders = exports.verifyPayment = exports.createCheckoutSession = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const AppError_1 = require("../utils/AppError");
 const user_model_1 = __importDefault(require("../models/user.model"));
 const Course_model_1 = __importDefault(require("../models/Course.model"));
-const path_1 = __importDefault(require("path"));
-const RedisConnect_1 = require("../utils/RedisConnect");
-const ejs_1 = __importDefault(require("ejs"));
 const order_services_1 = require("../services/order.services");
-const Sendemail_1 = __importDefault(require("../utils/Sendemail"));
-const Notification_model_1 = require("../models/Notification.model");
-const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-// create order
-exports.createOrder = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+const uuid_1 = require("uuid");
+const stripe_1 = __importDefault(require("stripe"));
+const Order_model_1 = require("../models/Order.model");
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeSecretKey || typeof stripeSecretKey !== "string") {
+    throw new Error("STRIPE_SECRET_KEY is not configured or is invalid");
+}
+const stripe = new stripe_1.default(stripeSecretKey);
+// Existing Functions (unchanged)
+exports.createCheckoutSession = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const { courseId, payment_info } = req.body;
-        if (payment_info) {
-            if ("id" in payment_info) {
-                const paymentIntentId = payment_info.id;
-                const paymentIntent = yield stripe.paymentIntents.retrieve(paymentIntentId);
-                if (paymentIntent.status !== "succeeded") {
-                    return next(new AppError_1.AppError("Payment not authorized!", 400));
-                }
-            }
+        const { courseId } = req.body;
+        if (!courseId) {
+            return next(new AppError_1.AppError("Course ID is required", 400));
         }
         const user = yield user_model_1.default.findById((_a = req.user) === null || _a === void 0 ? void 0 : _a._id);
-        const courseExistInUser = user === null || user === void 0 ? void 0 : user.courses.some((course) => course._id.toString() === courseId);
-        if (courseExistInUser) {
-            return next(new AppError_1.AppError("You have already purchased this course", 400));
+        if (!user) {
+            return next(new AppError_1.AppError("User not found", 404));
         }
         const course = yield Course_model_1.default.findById(courseId);
         if (!course) {
             return next(new AppError_1.AppError("Course not found", 404));
         }
-        const data = {
-            courseId: course._id,
-            userId: user === null || user === void 0 ? void 0 : user._id,
-            payment_info,
-        };
-        const mailData = {
-            order: {
-                id: course.id.toString().slice(0, 6),
-                name: course.name,
-                price: course.price,
-                date: new Date().toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                }),
+        const courseExistInUser = user.courses.some((c) => c.courseId.toString() === courseId);
+        if (courseExistInUser) {
+            return next(new AppError_1.AppError("You have already purchased this course", 400));
+        }
+        const orderNumber = (0, uuid_1.v4)().slice(0, 8);
+        const session = yield stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            line_items: [
+                {
+                    price_data: {
+                        currency: "usd",
+                        product_data: {
+                            name: course.name,
+                            description: course.description || "No description available",
+                        },
+                        unit_amount: Math.round(course.price * 100),
+                    },
+                    quantity: 1,
+                },
+            ],
+            mode: "payment",
+            success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}&courseId=${courseId}&orderNumber=${orderNumber}`,
+            cancel_url: `${process.env.FRONTEND_URL}/course/${courseId}`,
+            metadata: {
+                userId: user._id.toString(),
+                courseId,
+                orderNumber,
             },
-        };
-        const html = yield ejs_1.default.renderFile(path_1.default.join(__dirname, "../mails/order-confirmation.ejs"), { order: mailData });
-        try {
-            if (user) {
-                yield (0, Sendemail_1.default)({
-                    email: user.email,
-                    subject: "Order Confirmation",
-                    template: "order-confirmation.ejs",
-                    data: mailData,
-                });
-            }
-        }
-        catch (error) {
-            return next(new AppError_1.AppError(error.message, 500));
-        }
-        user === null || user === void 0 ? void 0 : user.courses.push(course === null || course === void 0 ? void 0 : course.id);
-        yield RedisConnect_1.client.set((_b = req.user) === null || _b === void 0 ? void 0 : _b.id, JSON.stringify(user));
-        yield (user === null || user === void 0 ? void 0 : user.save());
-        yield Notification_model_1.NotificaModel.create({
-            user: user === null || user === void 0 ? void 0 : user._id,
-            title: "New Order",
-            message: `You have a new order from ${course === null || course === void 0 ? void 0 : course.name}`,
         });
-        if (course) {
-            //+
-            course.purchased = (course.purchased || 0) + 1; //+
-        } //+
-        yield course.save();
-        (0, order_services_1.newOrder)(data, res, next);
+        res.status(200).json({
+            success: true,
+            sessionId: session.id,
+            sessionUrl: session.url,
+        });
     }
     catch (error) {
-        return next(new AppError_1.AppError(error.message, 500));
+        return next(new AppError_1.AppError(error.message || "Internal server error", 500));
     }
 }));
-// get All orders --- only for admin
+exports.verifyPayment = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { session_id } = req.query;
+        if (!session_id || typeof session_id !== "string") {
+            return next(new AppError_1.AppError("Session ID is required", 400));
+        }
+        const session = yield stripe.checkout.sessions.retrieve(session_id);
+        if (session.payment_status !== "paid") {
+            return next(new AppError_1.AppError("Payment not completed", 400));
+        }
+        const { userId, courseId } = session.metadata;
+        const user = yield user_model_1.default.findById(userId).select("+courses");
+        if (!user) {
+            return next(new AppError_1.AppError("User not found", 404));
+        }
+        if (!user.courses.some((c) => c.courseId === courseId)) {
+            user.courses.push({ courseId });
+            yield user.save();
+        }
+        const paymentInfo = {
+            id: session.id,
+            status: session.payment_status,
+            amount_paid: session.amount_total,
+            currency: session.currency,
+        };
+        const order = new Order_model_1.OrderModel({
+            userId,
+            courseId,
+            payment_info: paymentInfo,
+        });
+        yield order.save();
+        res.status(200).json({ success: true, user: user.toJSON() });
+    }
+    catch (error) {
+        return next(new AppError_1.AppError(error.message || "Internal server error", 500));
+    }
+}));
 exports.getAllOrders = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        (0, order_services_1.getAllOrdersService)(res);
+        yield (0, order_services_1.getAllOrdersService)(res);
     }
     catch (error) {
-        return next(new AppError_1.AppError(error.message, 500));
+        return next(new AppError_1.AppError(error.message || "Internal server error", 500));
     }
 }));
-//  send stripe publishble key
-exports.sendStripePublishableKey = (0, CatchAsyncError_1.CatchAsyncError)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    res.status(200).json({
-        publishablekey: process.env.STRIPE_PUBLISHABLE_KEY,
-    });
-}));
-// new payment
-exports.newPayment = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+exports.sendStripePublishableKey = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const myPayment = yield stripe.paymentIntents.create({
-            amount: req.body.amount,
-            currency: "USD",
-            description: "E-learning course services",
-            metadata: {
-                company: "E-Learning",
-            },
-            automatic_payment_methods: {
-                enabled: true,
-            },
-            shipping: {
-                name: "Harmik Lathiya",
-                address: {
-                    line1: "510 Townsend St",
-                    postal_code: "98140",
-                    city: "San Francisco",
-                    state: "CA",
-                    country: "US",
-                },
-            },
-        });
-        res.status(201).json({
+        if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+            return next(new AppError_1.AppError("Stripe publishable key not configured", 500));
+        }
+        res.status(200).json({
             success: true,
-            client_secret: myPayment.client_secret,
+            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
         });
     }
     catch (error) {
-        return next(new AppError_1.AppError(error.message, 500));
+        return next(new AppError_1.AppError(error.message || "Internal server error", 500));
+    }
+}));
+// New Function: Check Purchase
+exports.checkPurchase = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { courseId } = req.query;
+        if (!courseId || typeof courseId !== "string") {
+            return next(new AppError_1.AppError("Course ID is required", 400));
+        }
+        const user = yield user_model_1.default.findById((_a = req.user) === null || _a === void 0 ? void 0 : _a._id).select("+courses");
+        if (!user) {
+            return res.status(200).json({ success: true, purchased: false }); // Allow unauthenticated check
+        }
+        const purchased = user.courses.some((c) => c.courseId === courseId);
+        res.status(200).json({ success: true, purchased });
+    }
+    catch (error) {
+        return next(new AppError_1.AppError(error.message || "Internal server error", 500));
     }
 }));

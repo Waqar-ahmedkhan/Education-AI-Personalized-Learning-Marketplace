@@ -18,6 +18,7 @@ const order_route_1 = __importDefault(require("./routes/order.route"));
 const notification_route_1 = __importDefault(require("./routes/notification.route"));
 const admin_route_1 = __importDefault(require("./routes/admin.route"));
 const analytics_route_1 = __importDefault(require("./routes/analytics.route"));
+const layout_route_1 = __importDefault(require("./routes/layout.route"));
 dotenv_1.default.config();
 exports.app = (0, express_1.default)();
 // Middlewares
@@ -34,6 +35,7 @@ exports.app.use("/api/v1", course_route_1.default);
 exports.app.use("/api/v1", order_route_1.default);
 exports.app.use("/api/v1", notification_route_1.default);
 exports.app.use("/api/v1", analytics_route_1.default);
+exports.app.use("/api/v1", layout_route_1.default);
 exports.app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send("Something went wrong");

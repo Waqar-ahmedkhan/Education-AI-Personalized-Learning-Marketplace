@@ -1,4 +1,4 @@
-// pages/orders.tsx
+// pages/orders.tsx (unchanged)
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -13,7 +13,6 @@ const OrdersPage: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const router = useRouter();
 
-  // Redirect non-admins or unauthenticated users
   useEffect(() => {
     if (!isLoading && (!isAdmin || isTokenExpired)) {
       router.push('/auth/login?error=Admin+access+required');

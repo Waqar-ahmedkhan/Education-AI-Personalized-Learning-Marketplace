@@ -1,22 +1,29 @@
+"use client";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
+import axios, { AxiosError } from "axios";
+import { motion } from "framer-motion";
+import BackButton from "@/components/courses/BackButton";
+import VideoPlayer from "@/components/courses/VideoPlayer";
+import Curriculum from "@/components/courses/Curriculum";
+import CourseStats from "@/components/courses/CourseStats";
+import ProgressTracker from "@/components/courses/ProgressTracker";
+import LessonNavigation from "@/components/courses/LessonNavigation";
+import SkeletonCoursePage from "@/components/courses/SkeletonCoursePage";
+import ErrorDisplay from "@/components/courses/ErrorDisplay";
+import CourseInteraction from "@/components/courses/CourseEngegement";
+import QuizGenerator from "@/components/courses/QuizGenerator";
+import {
+  Star,
+  BookOpen,
+  Link as LinkIcon,
+  Award,
+  Trophy,
+  User,
+  Send,
+} from "lucide-react";
 
-'use client';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
-import axios, { AxiosError } from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
-import BackButton from '@/components/courses/BackButton';
-import VideoPlayer from '@/components/courses/VideoPlayer';
-import Curriculum from '@/components/courses/Curriculum';
-import CourseStats from '@/components/courses/CourseStats';
-import ProgressTracker from '@/components/courses/ProgressTracker';
-import LessonNavigation from '@/components/courses/LessonNavigation';
-import SkeletonCoursePage from '@/components/courses/SkeletonCoursePage';
-import ErrorDisplay from '@/components/courses/ErrorDisplay';
-import CourseInteraction from '@/components/courses/CourseEngegement'; // Import new component
-import { Star, BookOpen, Link as LinkIcon, Award, Trophy, User, Send } from 'lucide-react';
-
-// Type Definitions (unchanged except for IComment)
 interface CourseInstructor {
   name: string;
   bio: string;
@@ -38,6 +45,7 @@ interface IQuizQuestion {
   options: string[];
   correctAnswer: number;
   explanation: string;
+  topic: string;
 }
 
 interface IQuiz {
@@ -52,9 +60,12 @@ interface IComment {
   _id?: string;
   user: { _id: string; name: string; avatar?: string };
   question: string;
-  questionReplies: { user: { _id: string; name: string; avatar?: string }; answer: string }[];
+  questionReplies: {
+    user: { _id: string; name: string; avatar?: string };
+    answer: string;
+  }[];
   createdAt: Date;
-  starred?: boolean; // Added for star system
+  starred?: boolean;
 }
 
 interface IReview {
@@ -62,7 +73,10 @@ interface IReview {
   user: { _id: string; name: string; avatar?: string };
   rating: number;
   comment: string;
-  CommentReplies?: { user: { _id: string; name: string; avatar?: string }; comment: string }[];
+  CommentReplies?: {
+    user: { _id: string; name: string; avatar?: string };
+    comment: string;
+  }[];
 }
 
 interface CourseData {
@@ -90,7 +104,7 @@ interface Course {
   price: number;
   thumbnail: CourseThumbnail;
   tags: string[];
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  level: "Beginner" | "Intermediate" | "Advanced";
   instructor: CourseInstructor;
   duration: number;
   category: string;
@@ -110,38 +124,41 @@ interface ApiResponse<T> {
   message?: string;
 }
 
-type CourseError =
-  | 'COURSE_NOT_FOUND'
-  | 'NETWORK_ERROR'
-  | 'UNKNOWN_ERROR';
+type CourseError = "COURSE_NOT_FOUND" | "NETWORK_ERROR" | "UNKNOWN_ERROR";
 
 interface CoursePageError {
   type: CourseError;
   message: string;
 }
 
-// Mock User for Testing
-const mockUser = { _id: 'test-user', name: 'Test User', avatar: '/images/user-placeholder.jpg' };
+const mockUser = {
+  _id: "test-user",
+  name: "Test User",
+  avatar: "/images/user-placeholder.jpg",
+};
 
-// Review Component (unchanged)
 interface ReviewProps {
   reviews: IReview[];
   onSubmitReview: (review: string, rating: number) => void;
   onSubmitReply: (reviewId: string, comment: string) => void;
 }
 
-const Review: React.FC<ReviewProps> = ({ reviews, onSubmitReview, onSubmitReply }) => {
-  const [newReview, setNewReview] = useState('');
+const Review: React.FC<ReviewProps> = ({
+  reviews,
+  onSubmitReview,
+  onSubmitReply,
+}) => {
+  const [newReview, setNewReview] = useState("");
   const [newRating, setNewRating] = useState(0);
-  const [newReply, setNewReply] = useState('');
+  const [newReply, setNewReply] = useState("");
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
-  const isDark = useTheme().resolvedTheme === 'dark';
+  const isDark = useTheme().resolvedTheme === "dark";
 
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
     if (newReview.trim() && newRating > 0) {
       onSubmitReview(newReview, newRating);
-      setNewReview('');
+      setNewReview("");
       setNewRating(0);
     }
   };
@@ -150,7 +167,7 @@ const Review: React.FC<ReviewProps> = ({ reviews, onSubmitReview, onSubmitReply 
     e.preventDefault();
     if (newReply.trim()) {
       onSubmitReply(reviewId, newReply);
-      setNewReply('');
+      setNewReply("");
       setSelectedReviewId(null);
     }
   };
@@ -159,7 +176,9 @@ const Review: React.FC<ReviewProps> = ({ reviews, onSubmitReview, onSubmitReply 
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl p-6 shadow-xl bg-gradient-to-br ${isDark ? 'from-gray-800 to-gray-900' : 'from-white to-gray-100'} text-${isDark ? 'white' : 'gray-900'}`}
+      className={`rounded-2xl p-6 shadow-xl bg-gradient-to-br ${
+        isDark ? "from-gray-800 to-gray-900" : "from-white to-gray-100"
+      } text-${isDark ? "white" : "gray-900"}`}
     >
       <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
         <Star className="w-6 h-6 text-yellow-400" /> Reviews
@@ -171,16 +190,24 @@ const Review: React.FC<ReviewProps> = ({ reviews, onSubmitReview, onSubmitReply 
             value={newReview}
             onChange={(e) => setNewReview(e.target.value)}
             placeholder="Write your review..."
-            className={`flex-1 p-3 rounded-lg ${isDark ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-gray-200 text-gray-900 placeholder-gray-500'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            className={`flex-1 p-3 rounded-lg ${
+              isDark
+                ? "bg-gray-700 text-white placeholder-gray-400"
+                : "bg-gray-200 text-gray-900 placeholder-gray-500"
+            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
           />
           <select
             value={newRating}
             onChange={(e) => setNewRating(Number(e.target.value))}
-            className={`p-3 rounded-lg ${isDark ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-900'}`}
+            className={`p-3 rounded-lg ${
+              isDark ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-900"
+            }`}
           >
             <option value={0}>Rate (1-5)</option>
             {[1, 2, 3, 4, 5].map((r) => (
-              <option key={r} value={r}>{r} Star{r > 1 ? 's' : ''}</option>
+              <option key={r} value={r}>
+                {r} Star{r > 1 ? "s" : ""}
+              </option>
             ))}
           </select>
         </div>
@@ -188,9 +215,13 @@ const Review: React.FC<ReviewProps> = ({ reviews, onSubmitReview, onSubmitReply 
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           type="submit"
-          className={`px-4 py-3 rounded-lg ${isDark ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white flex items-center gap-2`}
+          className={`px-4 py-3 rounded-lg ${
+            isDark
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-blue-500 hover:bg-blue-600"
+          } text-white flex items-center gap-2`}
         >
-          <Send className="w-4 h-4" > Submit Review</Send>
+          <Send className="w-4 h-4" /> Submit Review
         </motion.button>
       </form>
       <div className="space-y-4">
@@ -199,14 +230,28 @@ const Review: React.FC<ReviewProps> = ({ reviews, onSubmitReview, onSubmitReply 
             <div className="flex items-center gap-2 mb-2">
               <User className="w-5 h-5 text-gray-400" />
               <p className="font-semibold">{r.user.name}</p>
-              <div className="flex">{Array.from({ length: r.rating }, (_, i) => <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />)}</div>
+              <div className="flex">
+                {Array.from({ length: r.rating }, (_, i) => (
+                  <Star
+                    key={i}
+                    className="w-4 h-4 text-yellow-400 fill-current"
+                  />
+                ))}
+              </div>
             </div>
             <p className="text-base mb-2">{r.comment}</p>
             {r.CommentReplies?.map((reply, rIndex) => (
-              <div key={rIndex} className={`ml-6 mt-2 p-3 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
+              <div
+                key={rIndex}
+                className={`ml-6 mt-2 p-3 rounded-lg ${
+                  isDark ? "bg-gray-700" : "bg-gray-200"
+                }`}
+              >
                 <div className="flex items-center gap-2 mb-1">
                   <User className="w-4 h-4 text-blue-400" />
-                  <p className="text-sm font-semibold text-blue-400">{reply.user.name} (Admin)</p>
+                  <p className="text-sm font-semibold text-blue-400">
+                    {reply.user.name} (Admin)
+                  </p>
                 </div>
                 <p className="text-sm">{reply.comment}</p>
               </div>
@@ -217,19 +262,27 @@ const Review: React.FC<ReviewProps> = ({ reviews, onSubmitReview, onSubmitReply 
             >
               <input
                 type="text"
-                value={selectedReviewId === r._id ? newReply : ''}
+                value={selectedReviewId === r._id ? newReply : ""}
                 onChange={(e) => {
                   setSelectedReviewId(r._id!);
                   setNewReply(e.target.value);
                 }}
                 placeholder="Reply as admin..."
-                className={`flex-1 p-2 rounded-lg ${isDark ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-gray-200 text-gray-900 placeholder-gray-500'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`flex-1 p-2 rounded-lg ${
+                  isDark
+                    ? "bg-gray-700 text-white placeholder-gray-400"
+                    : "bg-gray-200 text-gray-900 placeholder-gray-500"
+                } focus:outline-none focus:ring-2 focus:ring-blue-500`}
               />
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 type="submit"
-                className={`px-3 py-2 rounded-lg ${isDark ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+                className={`px-3 py-2 rounded-lg ${
+                  isDark
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-blue-500 hover:bg-blue-600"
+                } text-white`}
               >
                 Reply
               </motion.button>
@@ -241,7 +294,6 @@ const Review: React.FC<ReviewProps> = ({ reviews, onSubmitReview, onSubmitReply 
   );
 };
 
-// Main CourseContent Component
 export default function CourseContent(): React.JSX.Element {
   const { resolvedTheme } = useTheme();
   const params = useParams();
@@ -250,15 +302,15 @@ export default function CourseContent(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<CoursePageError | null>(null);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
-  const [expandedSection, setExpandedSection] = useState<string | null>('main');
+  const [expandedSection, setExpandedSection] = useState<string | null>("main");
   const [certificateId, setCertificateId] = useState<string | null>(null);
   const [xp, setXp] = useState(0);
   const [badges, setBadges] = useState<string[]>([]);
-  const isDark = resolvedTheme === 'dark';
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+  const isDark = resolvedTheme === "dark";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
   const courseId = useMemo(() => {
-    if (typeof params.id === 'string') return params.id;
+    if (typeof params.id === "string") return params.id;
     if (Array.isArray(params.id)) return params.id[0];
     return null;
   }, [params.id]);
@@ -268,17 +320,20 @@ export default function CourseContent(): React.JSX.Element {
       const error = axiosError as AxiosError;
       switch (error.response?.status) {
         case 404:
-          return { type: 'COURSE_NOT_FOUND', message: 'Course not found' };
+          return { type: "COURSE_NOT_FOUND", message: "Course not found" };
         default:
-          return { type: 'NETWORK_ERROR', message: 'Network error occurred. Please try again.' };
+          return {
+            type: "NETWORK_ERROR",
+            message: "Network error occurred. Please try again.",
+          };
       }
     }
-    return { type: 'UNKNOWN_ERROR', message: 'An unexpected error occurred' };
+    return { type: "UNKNOWN_ERROR", message: "An unexpected error occurred" };
   }, []);
 
   const fetchCourseContent = useCallback(async () => {
     if (!courseId) {
-      setError({ type: 'COURSE_NOT_FOUND', message: 'Invalid course ID' });
+      setError({ type: "COURSE_NOT_FOUND", message: "Invalid course ID" });
       setIsLoading(false);
       return;
     }
@@ -287,31 +342,41 @@ export default function CourseContent(): React.JSX.Element {
       setIsLoading(true);
       setError(null);
 
-      // Fetch course details
-      const courseResponse = await axios.get<ApiResponse<Course>>(`${baseUrl}/api/v1/get-course-content/${courseId}`);
-      if (!courseResponse.data.success) {
-        throw new Error(courseResponse.data.message || 'Failed to fetch course');
-      }
-
-      // Fetch course content (full access for free course)
-      const contentResponse = await axios.get<ApiResponse<{ courseData: CourseData[] }>>(
+      const courseResponse = await axios.get<ApiResponse<Course>>(
         `${baseUrl}/api/v1/get-course-content/${courseId}`
       );
+      if (!courseResponse.data.success) {
+        throw new Error(
+          courseResponse.data.message || "Failed to fetch course"
+        );
+      }
+
+      const contentResponse = await axios.get<
+        ApiResponse<{ courseData: CourseData[] }>
+      >(`${baseUrl}/api/v1/get-course-content/${courseId}`);
       if (!contentResponse.data.success) {
-        throw new Error(contentResponse.data.message || 'Failed to fetch course content');
+        throw new Error(
+          contentResponse.data.message || "Failed to fetch course content"
+        );
       }
 
       const courseData: Course = {
         ...courseResponse.data.data,
         thumbnail: courseResponse.data.data.thumbnail?.url
           ? courseResponse.data.data.thumbnail
-          : { public_id: `fallback-${courseId}`, url: '/images/fallback-course.jpg' },
+          : {
+              public_id: `fallback-${courseId}`,
+              url: "/images/fallback-course.jpg",
+            },
         instructor: {
-          name: courseResponse.data.data.instructor?.name || 'Unknown Instructor',
-          bio: courseResponse.data.data.instructor?.bio || 'No bio available',
-          avatar: courseResponse.data.data.instructor?.avatar || '/images/instructor-placeholder.jpg',
+          name:
+            courseResponse.data.data.instructor?.name || "Unknown Instructor",
+          bio: courseResponse.data.data.instructor?.bio || "No bio available",
+          avatar:
+            courseResponse.data.data.instructor?.avatar ||
+            "/images/instructor-placeholder.jpg",
         },
-        courseData: contentResponse.data.data.courseData.map(lesson => ({
+        courseData: contentResponse.data.data.courseData.map((lesson) => ({
           ...lesson,
           question: lesson.question || [],
           completed: lesson.completed ?? false,
@@ -320,14 +385,22 @@ export default function CourseContent(): React.JSX.Element {
         certificates: courseResponse.data.data.certificates || [],
         gamification: courseResponse.data.data.gamification || [],
         progress: contentResponse.data.data.courseData
-          ? (contentResponse.data.data.courseData.filter(lesson => lesson.completed).length /
-              contentResponse.data.data.courseData.length) * 100
+          ? (contentResponse.data.data.courseData.filter(
+              (lesson) => lesson.completed
+            ).length /
+              contentResponse.data.data.courseData.length) *
+            100
           : 0,
       };
 
       setCourse(courseData);
-      setXp(courseData.gamification?.find(g => g.user === mockUser._id)?.xp || 0);
-      setBadges(courseData.gamification?.find(g => g.user === mockUser._id)?.badges || []);
+      setXp(
+        courseData.gamification?.find((g) => g.user === mockUser._id)?.xp || 0
+      );
+      setBadges(
+        courseData.gamification?.find((g) => g.user === mockUser._id)?.badges ||
+          []
+      );
       if (courseData.courseData?.[0]?.videoUrl) {
         setActiveVideo(courseData.courseData[0].videoUrl);
       } else if (courseData.demoUrl) {
@@ -345,32 +418,35 @@ export default function CourseContent(): React.JSX.Element {
   }, [fetchCourseContent]);
 
   const toggleSection = useCallback((sectionId: string) => {
-    setExpandedSection(prev => (prev === sectionId ? null : sectionId));
+    setExpandedSection((prev) => (prev === sectionId ? null : sectionId));
   }, []);
 
   const handleMarkComplete = useCallback(
     async (contentId: string) => {
-      // Mock trackProgress for testing
-      setCourse(prev =>
+      setCourse((prev) =>
         prev
           ? {
               ...prev,
-              courseData: prev.courseData?.map(lesson =>
-                lesson._id === contentId ? { ...lesson, completed: true } : lesson
+              courseData: prev.courseData?.map((lesson) =>
+                lesson._id === contentId
+                  ? { ...lesson, completed: true }
+                  : lesson
               ),
               progress:
                 prev.courseData && prev.courseData.length > 0
-                  ? (prev.courseData.filter(l => l._id === contentId ? true : l.completed).length /
-                      prev.courseData.length) * 100
+                  ? (prev.courseData.filter((l) =>
+                      l._id === contentId ? true : l.completed
+                    ).length /
+                      prev.courseData.length) *
+                    100
                   : prev.progress,
             }
           : null
       );
-      // Mock addGamificationXP (add 10 XP per lesson)
-      setXp(prev => {
+      setXp((prev) => {
         const newXp = prev + 10;
-        if (newXp >= 100 && !badges.includes('Beginner')) {
-          setBadges([...badges, 'Beginner']);
+        if (newXp >= 100 && !badges.includes("Beginner")) {
+          setBadges([...badges, "Beginner"]);
         }
         return newXp;
       });
@@ -382,11 +458,10 @@ export default function CourseContent(): React.JSX.Element {
     async (score: number, contentId: string) => {
       if (score >= 70) {
         await handleMarkComplete(contentId);
-        // Mock addGamificationXP (add 10 XP for passing quiz)
-        setXp(prev => {
+        setXp((prev) => {
           const newXp = prev + 10;
-          if (newXp >= 100 && !badges.includes('Beginner')) {
-            setBadges([...badges, 'Beginner']);
+          if (newXp >= 100 && !badges.includes("Beginner")) {
+            setBadges([...badges, "Beginner"]);
           }
           return newXp;
         });
@@ -397,12 +472,11 @@ export default function CourseContent(): React.JSX.Element {
 
   const handleSubmitQuestion = useCallback(
     (contentId: string) => async (question: string) => {
-      // Mock addQuestion for testing
-      setCourse(prev =>
+      setCourse((prev) =>
         prev
           ? {
               ...prev,
-              courseData: prev.courseData?.map(lesson =>
+              courseData: prev.courseData?.map((lesson) =>
                 lesson._id === contentId
                   ? {
                       ...lesson,
@@ -414,8 +488,13 @@ export default function CourseContent(): React.JSX.Element {
                           question,
                           questionReplies: [
                             {
-                              user: { _id: 'admin', name: 'Admin', avatar: '/images/admin-placeholder.jpg' },
-                              answer: 'This is a mock admin response for testing.',
+                              user: {
+                                _id: "admin",
+                                name: "Admin",
+                                avatar: "/images/admin-placeholder.jpg",
+                              },
+                              answer:
+                                "This is a mock admin response for testing.",
                             },
                           ],
                           createdAt: new Date(),
@@ -434,22 +513,28 @@ export default function CourseContent(): React.JSX.Element {
 
   const handleSubmitAnswer = useCallback(
     (contentId: string) => async (questionId: string, answer: string) => {
-      // Mock addAnswer for testing
-      setCourse(prev =>
+      setCourse((prev) =>
         prev
           ? {
               ...prev,
-              courseData: prev.courseData?.map(lesson =>
+              courseData: prev.courseData?.map((lesson) =>
                 lesson._id === contentId
                   ? {
                       ...lesson,
-                      question: lesson.question.map(q =>
+                      question: lesson.question.map((q) =>
                         q._id === questionId
                           ? {
                               ...q,
                               questionReplies: [
                                 ...(q.questionReplies || []),
-                                { user: { _id: 'admin', name: 'Admin', avatar: '/images/admin-placeholder.jpg' }, answer },
+                                {
+                                  user: {
+                                    _id: "admin",
+                                    name: "Admin",
+                                    avatar: "/images/admin-placeholder.jpg",
+                                  },
+                                  answer,
+                                },
                               ],
                             }
                           : q
@@ -466,16 +551,15 @@ export default function CourseContent(): React.JSX.Element {
 
   const handleStarQuestion = useCallback(
     (contentId: string) => async (questionId: string) => {
-      // Mock starQuestion for testing
-      setCourse(prev =>
+      setCourse((prev) =>
         prev
           ? {
               ...prev,
-              courseData: prev.courseData?.map(lesson =>
+              courseData: prev.courseData?.map((lesson) =>
                 lesson._id === contentId
                   ? {
                       ...lesson,
-                      question: lesson.question.map(q =>
+                      question: lesson.question.map((q) =>
                         q._id === questionId ? { ...q, starred: !q.starred } : q
                       ),
                     }
@@ -490,8 +574,7 @@ export default function CourseContent(): React.JSX.Element {
 
   const handleSubmitReview = useCallback(
     async (review: string, rating: number) => {
-      // Mock addReview for testing
-      setCourse(prev =>
+      setCourse((prev) =>
         prev
           ? {
               ...prev,
@@ -505,33 +588,39 @@ export default function CourseContent(): React.JSX.Element {
                   CommentReplies: [],
                 },
               ],
-              rating:
-                prev.reviews
-                  ? (prev.reviews.reduce((acc, r) => acc + r.rating, 0) + rating) / (prev.reviews.length + 1)
-                  : rating,
+              rating: prev.reviews
+                ? (prev.reviews.reduce((acc, r) => acc + r.rating, 0) +
+                    rating) /
+                  (prev.reviews.length + 1)
+                : rating,
             }
           : null
       );
-      // Mock addGamificationXP (add 5 XP for review)
-      setXp(prev => prev + 5);
+      setXp((prev) => prev + 5);
     },
     []
   );
 
   const handleSubmitReply = useCallback(
     async (reviewId: string, comment: string) => {
-      // Mock addReplyToReview for testing
-      setCourse(prev =>
+      setCourse((prev) =>
         prev
           ? {
               ...prev,
-              reviews: prev.reviews.map(r =>
+              reviews: prev.reviews.map((r) =>
                 r._id === reviewId
                   ? {
                       ...r,
                       CommentReplies: [
                         ...(r.CommentReplies || []),
-                        { user: { _id: 'admin', name: 'Admin', avatar: '/images/admin-placeholder.jpg' }, comment },
+                        {
+                          user: {
+                            _id: "admin",
+                            name: "Admin",
+                            avatar: "/images/admin-placeholder.jpg",
+                          },
+                          comment,
+                        },
                       ],
                     }
                   : r
@@ -545,27 +634,32 @@ export default function CourseContent(): React.JSX.Element {
 
   const handleGenerateCertificate = useCallback(async () => {
     if (!course) return;
-    const completedCount = course.courseData.filter(l => l.completed).length;
+    const completedCount = course.courseData.filter((l) => l.completed).length;
     if (completedCount !== course.courseData.length) {
-      setError({ type: 'UNKNOWN_ERROR', message: 'Complete all modules to get certificate' });
+      setError({
+        type: "UNKNOWN_ERROR",
+        message: "Complete all modules to get certificate",
+      });
       return;
     }
-    // Mock generateCertificate for testing
     const newCertificateId = `mock-cert-${Date.now()}`;
     setCertificateId(newCertificateId);
-    setCourse(prev =>
+    setCourse((prev) =>
       prev
         ? {
             ...prev,
             certificates: [
               ...(prev.certificates || []),
-              { user: mockUser._id, issuedAt: new Date(), certificateId: newCertificateId },
+              {
+                user: mockUser._id,
+                issuedAt: new Date(),
+                certificateId: newCertificateId,
+              },
             ],
           }
         : null
     );
-    // Mock downloadCertificatePDF
-    alert('Certificate generated! In production, this would download a PDF.');
+    alert("Certificate generated! In production, this would download a PDF.");
   }, [course]);
 
   const formatDuration = useCallback((duration: number): string => {
@@ -574,14 +668,23 @@ export default function CourseContent(): React.JSX.Element {
     return `${hours}h ${minutes}m`;
   }, []);
 
-  const renderStars = useCallback((rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`w-5 h-5 ${i < Math.floor(rating) ? 'text-yellow-400 fill-current' : isDark ? 'text-gray-600' : 'text-gray-300'}`}
-      />
-    ));
-  }, [isDark]);
+  const renderStars = useCallback(
+    (rating: number) => {
+      return Array.from({ length: 5 }, (_, i) => (
+        <Star
+          key={i}
+          className={`w-5 h-5 ${
+            i < Math.floor(rating)
+              ? "text-yellow-400 fill-current"
+              : isDark
+              ? "text-gray-600"
+              : "text-gray-300"
+          }`}
+        />
+      ));
+    },
+    [isDark]
+  );
 
   if (isLoading) {
     return <SkeletonCoursePage />;
@@ -594,7 +697,7 @@ export default function CourseContent(): React.JSX.Element {
   if (!course) {
     return (
       <ErrorDisplay
-        error={{ type: 'COURSE_NOT_FOUND', message: 'Course not found' }}
+        error={{ type: "COURSE_NOT_FOUND", message: "Course not found" }}
         onRetry={fetchCourseContent}
       />
     );
@@ -610,7 +713,9 @@ export default function CourseContent(): React.JSX.Element {
       initial="initial"
       animate="animate"
       exit="exit"
-      className={`min-h-screen bg-gradient-to-b ${isDark ? 'from-gray-900 to-gray-800' : 'from-gray-50 to-gray-200'} py-12 px-4 sm:px-6 lg:px-8`}
+      className={`min-h-screen bg-gradient-to-b ${
+        isDark ? "from-gray-900 to-gray-800" : "from-gray-50 to-gray-200"
+      } py-12 px-4 sm:px-6 lg:px-8`}
       aria-labelledby="course-title"
     >
       <div className="max-w-7xl mx-auto">
@@ -621,31 +726,43 @@ export default function CourseContent(): React.JSX.Element {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             id="course-title"
-            className={`text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r ${isDark ? 'from-blue-400 to-purple-400' : 'from-blue-600 to-purple-600'}`}
+            className={`text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r ${
+              isDark
+                ? "from-blue-400 to-purple-400"
+                : "from-blue-600 to-purple-600"
+            }`}
           >
             {course.name}
           </motion.h1>
-          {/* Gamification Display */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-2xl p-6 shadow-xl bg-gradient-to-br ${isDark ? 'from-gray-800 to-gray-900' : 'from-white to-gray-100'} text-${isDark ? 'white' : 'gray-900'}`}
+            className={`rounded-2xl p-6 shadow-xl bg-gradient-to-br ${
+              isDark ? "from-gray-800 to-gray-900" : "from-white to-gray-100"
+            } text-${isDark ? "white" : "gray-900"}`}
           >
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Trophy className="w-6 h-6 text-yellow-400" /> Your Progress
             </h2>
             <p className="text-lg">XP: {xp}</p>
-            <p className="text-lg">Badges: {badges.length > 0 ? badges.join(', ') : 'None'}</p>
+            <p className="text-lg">
+              Badges: {badges.length > 0 ? badges.join(", ") : "None"}
+            </p>
             {certificateId && (
               <p className="text-lg flex items-center gap-2">
-                <Award className="w-5 h-5 text-green-400" /> Certificate Earned (ID: {certificateId})
+                <Award className="w-5 h-5 text-green-400" /> Certificate Earned
+                (ID: {certificateId})
               </p>
             )}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleGenerateCertificate}
-              className={`mt-4 px-4 py-3 rounded-lg ${isDark ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'} text-white flex items-center gap-2`}
+              className={`mt-4 px-4 py-3 rounded-lg ${
+                isDark
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-green-500 hover:bg-green-600"
+              } text-white flex items-center gap-2`}
             >
               <Award className="w-4 h-4" /> Generate Certificate
             </motion.button>
@@ -665,16 +782,24 @@ export default function CourseContent(): React.JSX.Element {
                 activeVideo={activeVideo}
                 handleNextLesson={() => {
                   if (!course?.courseData || !activeVideo) return;
-                  const currentIndex = course.courseData.findIndex(lesson => lesson.videoUrl === activeVideo);
+                  const currentIndex = course.courseData.findIndex(
+                    (lesson) => lesson.videoUrl === activeVideo
+                  );
                   if (currentIndex < course.courseData.length - 1) {
-                    setActiveVideo(course.courseData[currentIndex + 1].videoUrl);
+                    setActiveVideo(
+                      course.courseData[currentIndex + 1].videoUrl
+                    );
                   }
                 }}
                 handlePreviousLesson={() => {
                   if (!course?.courseData || !activeVideo) return;
-                  const currentIndex = course.courseData.findIndex(lesson => lesson.videoUrl === activeVideo);
+                  const currentIndex = course.courseData.findIndex(
+                    (lesson) => lesson.videoUrl === activeVideo
+                  );
                   if (currentIndex > 0) {
-                    setActiveVideo(course.courseData[currentIndex - 1].videoUrl);
+                    setActiveVideo(
+                      course.courseData[currentIndex - 1].videoUrl
+                    );
                   }
                 }}
                 handleMarkComplete={handleMarkComplete}
@@ -687,19 +812,41 @@ export default function CourseContent(): React.JSX.Element {
                 toggleSection={toggleSection}
                 formatDuration={formatDuration}
               />
-              {/* Additional Resources */}
-              {course.courseData?.some(lesson => lesson.additionalResources?.length > 0) && (
+              {course.courseData?.map((lesson) => (
+                <div key={lesson._id} className="space-y-6">
+                  <QuizGenerator
+                    courseId={course._id}
+                    lessonId={lesson._id}
+                    onCompleteQuiz={handleQuizComplete}
+                    courseName={course.name} // e.g., "Introduction to Machine Learning"
+                  />
+                  <CourseInteraction
+                    lesson={lesson}
+                    onSubmitQuestion={handleSubmitQuestion(lesson._id)}
+                    onSubmitAnswer={handleSubmitAnswer(lesson._id)}
+                    onStarQuestion={handleStarQuestion(lesson._id)}
+                    onCompleteQuiz={handleQuizComplete}
+                  />
+                </div>
+              ))}
+              {course.courseData?.some(
+                (lesson) => lesson.additionalResources?.length > 0
+              ) && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-2xl p-6 shadow-xl bg-gradient-to-br ${isDark ? 'from-gray-800 to-gray-900' : 'from-white to-gray-100'} text-${isDark ? 'white' : 'gray-900'}`}
+                  className={`rounded-2xl p-6 shadow-xl bg-gradient-to-br ${
+                    isDark
+                      ? "from-gray-800 to-gray-900"
+                      : "from-white to-gray-100"
+                  } text-${isDark ? "white" : "gray-900"}`}
                 >
                   <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                     <BookOpen className="w-6 h-6" /> Additional Resources
                   </h2>
                   <div className="grid gap-4">
-                    {course.courseData?.map(lesson =>
-                      lesson.additionalResources?.map(resource => (
+                    {course.courseData?.map((lesson) =>
+                      lesson.additionalResources?.map((resource) => (
                         <a
                           key={resource.url}
                           href={resource.url}
@@ -715,18 +862,6 @@ export default function CourseContent(): React.JSX.Element {
                   </div>
                 </motion.div>
               )}
-              {/* Interaction Section (Replaces Quiz and QuestionAnswer) */}
-              {course.courseData?.map(lesson => (
-                <CourseInteraction
-                  key={lesson._id}
-                  lesson={lesson}
-                  onSubmitQuestion={handleSubmitQuestion(lesson._id)}
-                  onSubmitAnswer={handleSubmitAnswer(lesson._id)}
-                  onStarQuestion={handleStarQuestion(lesson._id)}
-                  onCompleteQuiz={handleQuizComplete}
-                />
-              ))}
-              {/* Reviews */}
               <Review
                 reviews={course.reviews}
                 onSubmitReview={handleSubmitReview}

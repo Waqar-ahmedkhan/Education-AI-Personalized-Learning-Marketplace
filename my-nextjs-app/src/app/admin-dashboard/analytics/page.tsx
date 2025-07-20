@@ -1,4 +1,3 @@
-// app/admin-dashboard/analytics/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -34,21 +33,43 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import Cookies from 'js-cookie';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import Cookies from 'js-cookies';
 
-// Interface for analytics data (labels and data points for charts)
+// Register Chart.js components
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
+// Interface for raw analytics data from backend
+interface RawAnalyticsData {
+  last12Months: { month: string; count: number }[];
+}
+
+// Interface for processed analytics data for charts
 interface AnalyticsData {
   labels: string[];
   data: number[];
 }
 
-// Interface for API responses from analytics endpoints
-interface ApiResponse<T> {
+// Interface for user details
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+}
+
+// Interface for API responses
+interface ApiResponse {
   success: boolean;
-  users?: T;
-  courses?: T;
-  orders?: T;
-  data?: T;
+  users?: RawAnalyticsData;
+  courses?: RawAnalyticsData;
+  orders?: RawAnalyticsData;
+  message?: string;
+}
+
+interface LatestUsersResponse {
+  success: boolean;
+  latestUsers?: User[];
   message?: string;
 }
 
@@ -66,51 +87,45 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
-// Register Chart.js components for line charts
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
-
-// Enhanced animation variants for smoother transitions
+// Animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
-    },
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 },
   },
 };
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 30, scale: 0.95 },
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
   visible: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+    transition: { duration: 0.5, ease: 'easeOut' },
   },
   hover: {
     y: -5,
     scale: 1.02,
-    transition: { duration: 0.3, ease: 'easeInOut' },
+    transition: { duration: 0.3 },
   },
 };
 
 const chartVariants = {
-  hidden: { opacity: 0, scale: 0.8 },
+  hidden: { opacity: 0, scale: 0.9 },
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.8, ease: 'easeOut', delay: 0.3 },
+    transition: { duration: 0.7, ease: 'easeOut' },
   },
 };
 
 const headerVariants = {
-  hidden: { opacity: 0, y: -50 },
+  hidden: { opacity: 0, y: -30 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.8, ease: 'easeOut' },
+    transition: { duration: 0.6, ease: 'easeOut' },
   },
 };
 
@@ -118,24 +133,26 @@ export default function AnalyticsSection() {
   const { token, userRole, userName, isLoading } = useAuth() as AuthContextType;
   const router = useRouter();
 
-  // Initialize state with valid AnalyticsData to prevent undefined
+  // Initialize state for analytics data
   const [userData, setUserData] = useState<AnalyticsData>({ labels: [], data: [] });
   const [courseData, setCourseData] = useState<AnalyticsData>({ labels: [], data: [] });
   const [orderData, setOrderData] = useState<AnalyticsData>({ labels: [], data: [] });
+  const [latestUsers, setLatestUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  // Redirect non-admin users or unauthenticated users to forbidden page
+  // Redirect non-admin users
   useEffect(() => {
     if (!isLoading && (!token || userRole !== 'admin')) {
       router.push('/forbidden?error=Access denied. Admin role required.');
     }
   }, [isLoading, token, userRole, router]);
 
-  // Function to refresh access token when 401 error occurs
+  // Function to refresh access token
   const refreshToken = async (): Promise<string | null> => {
     try {
+     
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
       const res = await axios.get<RefreshTokenResponse>(
         `${baseUrl}/api/v1/user/refresh`,
@@ -151,13 +168,9 @@ export default function AnalyticsSection() {
         });
         return res.data.access_token;
       }
-      throw new Error('Failed to refresh token: Invalid response');
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error && 'response' in err
-          ? // @ts-ignore
-            err.response?.data?.message || err.message
-          : 'Unknown error during token refresh';
+      throw new Error('Failed to refresh token');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error during token refresh';
       console.error('Token refresh error:', errorMessage);
       toast.error('Session expired. Please log in again.');
       router.push('/auth/admin-login?error=Session expired. Please log in again.');
@@ -165,7 +178,22 @@ export default function AnalyticsSection() {
     }
   };
 
-  // Fetch analytics data function
+  // Transform raw analytics data to chart-compatible format
+  const transformAnalyticsData = (rawData: RawAnalyticsData | undefined): AnalyticsData => {
+    if (!rawData?.last12Months) {
+      console.warn('No last12Months data in rawData:', rawData);
+      return { labels: [], data: [] };
+    }
+    const sortedMonths = rawData.last12Months.sort(
+      (a, b) => new Date(a.month).getTime() - new Date(b.month).getTime()
+    );
+    return {
+      labels: sortedMonths.map((item) => item.month),
+      data: sortedMonths.map((item) => item.count),
+    };
+  };
+
+  // Fetch analytics data with error handling
   const fetchAnalytics = async (currentToken: string) => {
     if (!currentToken || userRole !== 'admin') return;
 
@@ -181,26 +209,23 @@ export default function AnalyticsSection() {
         dataKey: 'users' | 'courses' | 'orders'
       ): Promise<AnalyticsData> => {
         try {
-          const res = await axios.get<ApiResponse<AnalyticsData>>(url, { headers });
+          const res = await axios.get<ApiResponse>(url, { headers });
+          console.log(`API Response for ${endpointName}:`, res.data);
           if (res.data.success) {
-            const data = res.data[dataKey] || res.data.data;
-            return data && Array.isArray(data.labels) && Array.isArray(data.data)
-              ? data
-              : { labels: [], data: [] };
+            const transformedData = transformAnalyticsData(res.data[dataKey]);
+            console.log(`Transformed ${endpointName} Data:`, transformedData);
+            return transformedData;
           }
           toast.error(`${endpointName} request failed: ${res.data.message || 'Unknown error'}`);
           return { labels: [], data: [] };
-        } catch (err: unknown) {
-          const errorMessage =
-            err instanceof Error && 'response' in err
-              ? // @ts-ignore
-                err.response?.data?.message || err.message
-              : 'Unknown error';
-          if (err instanceof Error && 'response' in err && err.response?.status === 404) {
+        } catch (err: any) {
+          const errorMessage = err.response?.data?.message || 'Unknown error';
+          console.error(`${endpointName} error:`, err.response || err);
+          if (err.response?.status === 404) {
             toast.error(`${endpointName} endpoint not found`);
             return { labels: [], data: [] };
           }
-          if (err instanceof Error && 'response' in err && err.response?.status === 500) {
+          if (err.response?.status === 500) {
             toast.error(`${endpointName} server error`);
             return { labels: [], data: [] };
           }
@@ -208,33 +233,53 @@ export default function AnalyticsSection() {
         }
       };
 
-      const [usersData, coursesData, ordersData] = await Promise.all([
+      const fetchLatestUsers = async (): Promise<User[]> => {
+        try {
+          const res = await axios.get<LatestUsersResponse>(
+            `${baseUrl}/api/v1/get-latest-users?limit=5`,
+            { headers }
+          );
+          console.log('Latest Users Response:', res.data);
+          if (res.data.success && res.data.latestUsers) {
+            return res.data.latestUsers;
+          }
+          toast.error(`Latest users request failed: ${res.data.message || 'Unknown error'}`);
+          return [];
+        } catch (err: any) {
+          const errorMessage = err.response?.data?.message || 'Failed to fetch latest users';
+          console.error('Latest users error:', err.response || err);
+          toast.error(errorMessage);
+          return [];
+        }
+      };
+
+      const [usersData, coursesData, ordersData, latestUsersData] = await Promise.all([
         fetchWithErrorHandling(`${baseUrl}/api/v1/get-users-analytics`, 'Users analytics', 'users'),
         fetchWithErrorHandling(`${baseUrl}/api/v1/get-courses-analytics`, 'Courses analytics', 'courses'),
         fetchWithErrorHandling(`${baseUrl}/api/v1/get-orders-analytics`, 'Orders analytics', 'orders'),
+        fetchLatestUsers(),
       ]);
 
       setUserData(usersData);
       setCourseData(coursesData);
       setOrderData(ordersData);
+      setLatestUsers(latestUsersData);
 
       const warnings: string[] = [];
       if (!usersData.labels.length) warnings.push('Users analytics unavailable');
       if (!coursesData.labels.length) warnings.push('Courses analytics unavailable');
       if (!ordersData.labels.length) warnings.push('Orders analytics unavailable');
+      if (!latestUsersData.length) warnings.push('Latest users unavailable');
 
       if (warnings.length > 0) {
         const warningMessage = `Some data unavailable: ${warnings.join(', ')}`;
         setError(warningMessage);
         toast.error(warningMessage);
       }
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error && 'response' in err
-          ? // @ts-ignore
-            err.response?.data?.message || err.message
-          : 'Failed to load analytics data. Check server configuration.';
-      if (err instanceof Error && 'response' in err && err.response?.status === 401) {
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Failed to load analytics data.';
+      console.error('Fetch analytics error:', err.response || err);
+      if (err.response?.status === 401) {
         const newToken = await refreshToken();
         if (newToken) {
           fetchAnalytics(newToken);
@@ -251,8 +296,10 @@ export default function AnalyticsSection() {
 
   // Initial data fetch
   useEffect(() => {
-    if (!isLoading && token && userRole === 'admin') fetchAnalytics(token);
-  }, [token, userRole, isLoading, router]);
+    if (!isLoading && token && userRole === 'admin') {
+      fetchAnalytics(token);
+    }
+  }, [token, userRole, isLoading]);
 
   // Manual refresh function
   const handleRefresh = async () => {
@@ -261,34 +308,21 @@ export default function AnalyticsSection() {
     await fetchAnalytics(token);
   };
 
-  // Calculate total and growth metrics
+  // Calculate metrics
   const calculateMetrics = (data: AnalyticsData) => {
     const total = data.data.reduce((sum, count) => sum + count, 0);
     const latest = data.data[data.data.length - 1] || 0;
     const previous = data.data[data.data.length - 2] || 0;
     const growth = previous > 0 ? ((latest - previous) / previous) * 100 : 0;
-
     return { total, latest, growth };
   };
 
-  // Configure chart data for line charts
+  // Chart data configuration
   const createChartData = (data: AnalyticsData, type: 'users' | 'courses' | 'orders'): ChartData<'line'> => {
     const colors = {
-      users: {
-        border: '#6366f1',
-        background: 'rgba(99, 102, 241, 0.1)',
-        gradient: 'rgba(99, 102, 241, 0.3)',
-      },
-      courses: {
-        border: '#10b981',
-        background: 'rgba(16, 185, 129, 0.1)',
-        gradient: 'rgba(16, 185, 129, 0.3)',
-      },
-      orders: {
-        border: '#f59e0b',
-        background: 'rgba(245, 158, 11, 0.1)',
-        gradient: 'rgba(245, 158, 11, 0.3)',
-      },
+      users: { border: '#3B82F6', background: 'rgba(59, 130, 246, 0.1)', gradient: 'rgba(59, 130, 246, 0.3)' },
+      courses: { border: '#10B981', background: 'rgba(16, 185, 129, 0.1)', gradient: 'rgba(16, 185, 129, 0.3)' },
+      orders: { border: '#F59E0B', background: 'rgba(245, 158, 11, 0.1)', gradient: 'rgba(245, 158, 11, 0.3)' },
     };
 
     return {
@@ -298,50 +332,36 @@ export default function AnalyticsSection() {
           label: type.charAt(0).toUpperCase() + type.slice(1),
           data: data.data,
           borderColor: colors[type].border,
-          backgroundColor: colors[type].background,
+          backgroundColor: colors[type].gradient,
           fill: true,
           tension: 0.4,
           pointBackgroundColor: '#ffffff',
           pointBorderColor: colors[type].border,
           pointBorderWidth: 2,
           pointRadius: 4,
-          pointHoverRadius: 8,
-          pointHoverBackgroundColor: colors[type].border,
-          pointHoverBorderColor: '#ffffff',
-          pointHoverBorderWidth: 3,
+          pointHoverRadius: 6,
           borderWidth: 3,
         },
       ],
     };
   };
 
-  // Enhanced chart options
+  // Chart options
   const chartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: {
-      intersect: false,
-      mode: 'index',
-    },
+    interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: {
         position: 'top',
-        labels: {
-          usePointStyle: true,
-          pointStyle: 'circle',
-          padding: 20,
-          font: { size: 14, weight: 600 },
-        },
+        labels: { usePointStyle: true, pointStyle: 'circle', padding: 15, font: { size: 14 } },
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleColor: '#ffffff',
-        bodyColor: '#ffffff',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        borderWidth: 1,
-        padding: 12,
-        cornerRadius: 8,
-        displayColors: true,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        titleFont: { size: 14 },
+        bodyFont: { size: 12 },
+        padding: 10,
+        cornerRadius: 6,
         callbacks: {
           label: (context) => `${context.dataset.label}: ${context.parsed.y.toLocaleString()}`,
         },
@@ -350,52 +370,40 @@ export default function AnalyticsSection() {
     scales: {
       x: {
         grid: { display: false },
-        ticks: { font: { size: 12 }, maxRotation: 45 },
+        ticks: { font: { size: 12 }, maxRotation: 45, minRotation: 45 },
       },
       y: {
-        grid: { color: 'rgba(0, 0, 0, 0.1)' },
+        grid: { color: 'rgba(0, 0, 0, 0.05)' },
         ticks: {
           font: { size: 12 },
           callback: (value) => value.toLocaleString(),
+          stepSize: 1,
         },
         beginAtZero: true,
       },
     },
-    elements: {
-      line: {
-        borderCapStyle: 'round',
-        borderJoinStyle: 'round',
-      },
-    },
     animation: {
-      duration: 2000,
-      easing: 'easeInOutQuart',
+      duration: 1500,
+      easing: 'easeInOutQuad',
     },
   };
 
-  // Show loading spinner
+  // Loading state
   if (isLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <motion.div
           className="flex flex-col items-center space-y-4"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-            className="h-16 w-16 border-4 border-indigo-600 border-t-transparent rounded-full"
+            className="h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full"
           />
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-lg font-medium text-slate-600 dark:text-slate-400"
-          >
-            Loading Analytics...
-          </motion.p>
+          <p className="text-gray-600 dark:text-gray-300">Loading Analytics...</p>
         </motion.div>
       </div>
     );
@@ -406,20 +414,18 @@ export default function AnalyticsSection() {
   const orderMetrics = calculateMetrics(orderData);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8 max-w-7xl">
-        {/* Header Section */}
-        <motion.div variants={headerVariants} initial="hidden" animate="visible" className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
-            Analytics Dashboard
-          </h1>
-          <p className="text-lg text-slate-600 dark:text-slate-400 mb-6">
-            {userName ? `Welcome back, ${userName}` : 'Welcome to your analytics overview'}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <motion.div variants={headerVariants} initial="hidden" animate="visible" className="text-center mb-10">
+          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">Analytics Dashboard</h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300">
+            {userName ? `Welcome, ${userName}` : 'Admin Analytics Overview'}
           </p>
           <Button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium px-6 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
+            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition-colors"
           >
             {refreshing ? (
               <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -433,225 +439,260 @@ export default function AnalyticsSection() {
         {/* Error Alert */}
         <AnimatePresence>
           {error && (
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="mb-8">
-              <Alert className="bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800 max-w-2xl mx-auto">
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                <AlertTitle className="text-red-800 dark:text-red-400">Warning</AlertTitle>
-                <AlertDescription className="text-red-700 dark:text-red-300">{error}</AlertDescription>
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-8"
+            >
+              <Alert className="bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 max-w-2xl mx-auto">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <AlertTitle className="text-red-800 dark:text-red-300">Error</AlertTitle>
+                <AlertDescription className="text-red-700 dark:text-red-400">{error}</AlertDescription>
               </Alert>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Main Content */}
-        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Users Card */}
-            <motion.div variants={cardVariants} whileHover="hover">
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-white/20 rounded-full">
-                        <Users className="w-6 h-6" />
-                      </div>
-                      <CardTitle className="text-lg font-semibold">Users</CardTitle>
-                    </div>
-                    <div className="flex items-center space-x-1 text-sm">
-                      <TrendingUp className="w-4 h-4" />
-                      <span className={`font-medium ${userMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-                        {userMetrics.growth >= 0 ? '+' : ''}{userMetrics.growth.toFixed(1)}%
-                      </span>
-                    </div>
+        {/* Stats Cards */}
+        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Users Card */}
+          <motion.div variants={cardVariants} whileHover="hover">
+            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <CardHeader className="bg-blue-600 text-white p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-5 h-5" />
+                    <CardTitle className="text-lg font-semibold">Users</CardTitle>
                   </div>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-end space-x-2">
-                      <span className="text-3xl font-bold text-indigo-600">{userMetrics.total.toLocaleString()}</span>
-                      <span className="text-sm text-slate-500 mb-1">total</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Latest Month</span>
-                      <span className="font-medium text-indigo-600">{userMetrics.latest.toLocaleString()}</span>
-                    </div>
-                    {userData.labels.length > 0 && (
-                      <div className="flex items-center text-xs text-slate-500">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {userData.labels[userData.labels.length - 1]}
-                      </div>
-                    )}
+                  <div className="flex items-center space-x-1 text-sm">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className={`font-medium ${userMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                      {userMetrics.growth >= 0 ? '+' : ''}{userMetrics.growth.toFixed(1)}%
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex items-end space-x-2">
+                    <span className="text-2xl font-bold text-blue-600">{userMetrics.total.toLocaleString()}</span>
+                    <span className="text-sm text-gray-500">total</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-300">Latest Month</span>
+                    <span className="font-medium text-blue-600">{userMetrics.latest.toLocaleString()}</span>
+                  </div>
+                  {userData.labels.length > 0 && (
+                    <div className="flex items-center text-xs text-gray-500">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      {userData.labels[userData.labels.length - 1]}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-            {/* Courses Card */}
-            <motion.div variants={cardVariants} whileHover="hover">
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-white/20 rounded-full">
-                        <BookOpen className="w-6 h-6" />
-                      </div>
-                      <CardTitle className="text-lg font-semibold">Courses</CardTitle>
-                    </div>
-                    <div className="flex items-center space-x-1 text-sm">
-                      <TrendingUp className="w-4 h-4" />
-                      <span className={`font-medium ${courseMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-                        {courseMetrics.growth >= 0 ? '+' : ''}{courseMetrics.growth.toFixed(1)}%
-                      </span>
-                    </div>
+          {/* Courses Card */}
+          <motion.div variants={cardVariants} whileHover="hover">
+            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <CardHeader className="bg-emerald-600 text-white p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <BookOpen className="w-5 h-5" />
+                    <CardTitle className="text-lg font-semibold">Courses</CardTitle>
                   </div>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-end space-x-2">
-                      <span className="text-3xl font-bold text-emerald-600">{courseMetrics.total.toLocaleString()}</span>
-                      <span className="text-sm text-slate-500 mb-1">total</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Latest Month</span>
-                      <span className="font-medium text-emerald-600">{courseMetrics.latest.toLocaleString()}</span>
-                    </div>
-                    {courseData.labels.length > 0 && (
-                      <div className="flex items-center text-xs text-slate-500">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {courseData.labels[courseData.labels.length - 1]}
-                      </div>
-                    )}
+                  <div className="flex items-center space-x-1 text-sm">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className={`font-medium ${courseMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                      {courseMetrics.growth >= 0 ? '+' : ''}{courseMetrics.growth.toFixed(1)}%
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex items-end space-x-2">
+                    <span className="text-2xl font-bold text-emerald-600">{courseMetrics.total.toLocaleString()}</span>
+                    <span className="text-sm text-gray-500">total</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-300">Latest Month</span>
+                    <span className="font-medium text-emerald-600">{courseMetrics.latest.toLocaleString()}</span>
+                  </div>
+                  {courseData.labels.length > 0 && (
+                    <div className="flex items-center text-xs text-gray-500">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      {courseData.labels[courseData.labels.length - 1]}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-            {/* Orders Card */}
-            <motion.div variants={cardVariants} whileHover="hover">
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden md:col-span-2 lg:col-span-1">
-                <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-white/20 rounded-full">
-                        <ShoppingCart className="w-6 h-6" />
-                      </div>
-                      <CardTitle className="text-lg font-semibold">Orders</CardTitle>
-                    </div>
-                    <div className="flex items-center space-x-1 text-sm">
-                      <TrendingUp className="w-4 h-4" />
-                      <span className={`font-medium ${orderMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-                        {orderMetrics.growth >= 0 ? '+' : ''}{orderMetrics.growth.toFixed(1)}%
-                      </span>
-                    </div>
+          {/* Orders Card */}
+          <motion.div variants={cardVariants} whileHover="hover">
+            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <CardHeader className="bg-amber-600 text-white p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <ShoppingCart className="w-5 h-5" />
+                    <CardTitle className="text-lg font-semibold">Orders</CardTitle>
                   </div>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-end space-x-2">
-                      <span className="text-3xl font-bold text-amber-600">{orderMetrics.total.toLocaleString()}</span>
-                      <span className="text-sm text-slate-500 mb-1">total</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Latest Month</span>
-                      <span className="font-medium text-amber-600">{orderMetrics.latest.toLocaleString()}</span>
-                    </div>
-                    {orderData.labels.length > 0 && (
-                      <div className="flex items-center text-xs text-slate-500">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {orderData.labels[orderData.labels.length - 1]}
-                      </div>
-                    )}
+                  <div className="flex items-center space-x-1 text-sm">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className={`font-medium ${orderMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                      {orderMetrics.growth >= 0 ? '+' : ''}{orderMetrics.growth.toFixed(1)}%
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex items-end space-x-2">
+                    <span className="text-2xl font-bold text-amber-600">{orderMetrics.total.toLocaleString()}</span>
+                    <span className="text-sm text-gray-500">total</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-300">Latest Month</span>
+                    <span className="font-medium text-amber-600">{orderMetrics.latest.toLocaleString()}</span>
+                  </div>
+                  {orderData.labels.length > 0 && (
+                    <div className="flex items-center text-xs text-gray-500">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      {orderData.labels[orderData.labels.length - 1]}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
 
-          {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* User Growth Chart */}
-            <motion.div variants={chartVariants}>
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-full">
-                      <BarChart3 className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <CardTitle className="text-xl font-semibold text-slate-800 dark:text-slate-200">
-                      User Growth Trend
-                    </CardTitle>
+        {/* Latest Users Table */}
+        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="mb-8">
+          <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+            <CardHeader className="p-4 bg-blue-50 dark:bg-blue-900/20">
+              <div className="flex items-center space-x-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                  Latest Users (Last Month)
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4">
+              {latestUsers.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-gray-600 dark:text-gray-300">Name</TableHead>
+                      <TableHead className="text-gray-600 dark:text-gray-300">Email</TableHead>
+                      <TableHead className="text-gray-600 dark:text-gray-300">Joined</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {latestUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="text-gray-800 dark:text-gray-200">{user.name}</TableCell>
+                        <TableCell className="text-gray-800 dark:text-gray-200">{user.email}</TableCell>
+                        <TableCell className="text-gray-800 dark:text-gray-200">
+                          {new Date(user.createdAt).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="flex items-center justify-center h-[150px] text-gray-500">
+                  <div className="text-center">
+                    <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p>No recent users available</p>
                   </div>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="h-80">
-                    {userData.labels.length ? (
-                      <Line data={createChartData(userData, 'users')} options={chartOptions} />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center text-slate-500">
-                          <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                          <p>No user data available</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-            {/* Course Creation Chart */}
-            <motion.div variants={chartVariants}>
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
-                      <BookOpen className="w-5 h-5 text-emerald-600" />
-                    </div>
-                    <CardTitle className="text-xl font-semibold text-slate-800 dark:text-slate-200">
-                      Course Creation
-                    </CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="h-80">
-                    {courseData.labels.length ? (
-                      <Line data={createChartData(courseData, 'courses')} options={chartOptions} />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center text-slate-500">
-                          <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                          <p>No course data available</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Orders Chart - Full Width */}
+        {/* Charts */}
+        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* User Growth Chart */}
           <motion.div variants={chartVariants}>
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-6">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
-                    <ShoppingCart className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <CardTitle className="text-xl font-semibold text-slate-800 dark:text-slate-200">
-                    Order Activity Overview
+            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <CardHeader className="p-4 bg-blue-50 dark:bg-blue-900/20">
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    User Growth Trend
                   </CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="p-6">
-                <div className="h-96">
+              <CardContent className="p-4">
+                <div className="h-[300px]">
+                  {userData.labels.length ? (
+                    <Line data={createChartData(userData, 'users')} options={chartOptions} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <div className="text-center">
+                        <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p>No user data available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Course Creation Chart */}
+          <motion.div variants={chartVariants}>
+            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <CardHeader className="p-4 bg-emerald-50 dark:bg-emerald-900/20">
+                <div className="flex items-center space-x-2">
+                  <BookOpen className="w-5 h-5 text-emerald-600" />
+                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    Course Creation Trend
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="h-[300px]">
+                  {courseData.labels.length ? (
+                    <Line data={createChartData(courseData, 'courses')} options={chartOptions} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <div className="text-center">
+                        <BookOpen className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p>No course data available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Orders Chart */}
+          <motion.div variants={chartVariants} className="lg:col-span-2">
+            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+              <CardHeader className="p-4 bg-amber-50 dark:bg-amber-900/20">
+                <div className="flex items-center space-x-2">
+                  <ShoppingCart className="w-5 h-5 text-amber-600" />
+                  <CardTitle className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    Order Activity Trend
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="h-[350px]">
                   {orderData.labels.length ? (
                     <Line data={createChartData(orderData, 'orders')} options={chartOptions} />
                   ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center text-slate-500">
-                        <ShoppingCart className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <div className="text-center">
+                        <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-50" />
                         <p>No order data available</p>
                       </div>
                     </div>

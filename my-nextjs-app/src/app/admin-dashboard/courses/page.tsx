@@ -304,10 +304,10 @@ export default function CoursesSection() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end space-x-2">
-                            <Button
+                            <Button onClick={() => router.push(`/admin-dashboard/courses/${course._id}`)}
                               variant="outline"
                               size="sm"
-                              className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-all duration-200"
+                              className="border-blue-200  text-blue-600 hover:bg-blue-50 hover:border-blue-300 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-all duration-200"
                             >
                               <Edit2 className="h-4 w-4 sm:mr-2" />
                               <span className="hidden sm:inline">Edit</span>

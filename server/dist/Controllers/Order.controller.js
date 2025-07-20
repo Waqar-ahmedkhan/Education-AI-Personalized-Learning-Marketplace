@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkPurchase = exports.sendStripePublishableKey = exports.getAllOrders = exports.verifyPayment = exports.createCheckoutSession = void 0;
+exports.enrollCourse = exports.checkPurchase = exports.sendStripePublishableKey = exports.getAllOrders = exports.verifyPayment = exports.createCheckoutSession = void 0;
 const CatchAsyncError_1 = require("../middlewares/CatchAsyncError");
 const AppError_1 = require("../utils/AppError");
 const user_model_1 = __importDefault(require("../models/user.model"));
@@ -21,6 +21,7 @@ const order_services_1 = require("../services/order.services");
 const uuid_1 = require("uuid");
 const stripe_1 = __importDefault(require("stripe"));
 const Order_model_1 = require("../models/Order.model");
+const RedisConnect_1 = require("../utils/RedisConnect");
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 if (!stripeSecretKey || typeof stripeSecretKey !== "string") {
     throw new Error("STRIPE_SECRET_KEY is not configured or is invalid");
@@ -157,5 +158,41 @@ exports.checkPurchase = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) 
     }
     catch (error) {
         return next(new AppError_1.AppError(error.message || "Internal server error", 500));
+    }
+}));
+exports.enrollCourse = (0, CatchAsyncError_1.CatchAsyncError)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { courseId } = req.body;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        if (!userId || !courseId) {
+            return next(new AppError_1.AppError("Missing user ID or course ID", 400));
+        }
+        const user = yield user_model_1.default.findById(userId).select("+courses");
+        if (!user) {
+            return next(new AppError_1.AppError("User not found", 404));
+        }
+        if (user.courses.some((c) => String(c.courseId) === String(courseId))) {
+            return res.status(400).json({
+                success: false,
+                message: "You have already purchased this course",
+            });
+        }
+        user.courses.push({ courseId });
+        yield user.save();
+        console.log(`Enrolled user ${userId} in free course ${courseId}`);
+        // Invalidate Redis caches
+        yield RedisConnect_1.client.del(`user:${userId}`);
+        yield RedisConnect_1.client.del(`purchased_courses_${userId}`);
+        yield RedisConnect_1.client.del(`purchase:${userId}:${courseId}`);
+        console.log(`Invalidated Redis caches for user ${userId}`);
+        return res.status(200).json({
+            success: true,
+            user,
+        });
+    }
+    catch (err) {
+        console.error("Enroll course error:", err);
+        return next(new AppError_1.AppError(err.message, 500));
     }
 }));

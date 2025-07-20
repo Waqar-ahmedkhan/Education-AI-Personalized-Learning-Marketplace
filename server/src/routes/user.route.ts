@@ -36,6 +36,7 @@ UserRoute.post("/user/social-auth", socialAuth);
 UserRoute.post("/user/forgot-password", forgotPasswordLimiter, forgetPassword);
 UserRoute.post("/user/reset-password", resetPassword);
 
+
 // Protected user routes
 UserRoute.get("/user/refresh", isAuthenticated, isUser, updateAccessToken);
 UserRoute.get("/user/logout", isAuthenticated, isUser, UserLogout);

@@ -513,35 +513,35 @@ exports.getUserPurchasedCourses = (0, CatchAsyncError_1.CatchAsyncError)((req, r
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         if (!userId)
             return next(new AppError_1.AppError("User not authenticated", 401));
-        // Check Redis cache
         const cacheKey = `purchased_courses_${userId}`;
         const cachedCourses = yield RedisConnect_1.client.get(cacheKey);
         if (cachedCourses) {
-            console.log("Hitting Redis cache for purchased courses");
+            console.log(`Hitting Redis cache for purchased courses: ${userId}`);
             return res.status(200).json({
                 success: true,
                 data: JSON.parse(cachedCourses),
             });
         }
-        // Fetch user with courses and progress
+        console.log(`Cache miss for purchased courses: ${userId}`);
         const user = yield user_model_1.default.findById(userId).select("courses courseProgress");
         if (!user)
             return next(new AppError_1.AppError("User not found", 404));
         const purchasedCourseIds = user.courses.map((course) => course.courseId);
         if (purchasedCourseIds.length === 0) {
-            return res.status(200).json({
+            const emptyResponse = {
                 success: true,
                 data: [],
                 message: "No courses purchased",
-            });
+            };
+            yield RedisConnect_1.client.set(cacheKey, JSON.stringify(emptyResponse.data), { EX: 604800 });
+            return res.status(200).json(emptyResponse);
         }
         const courses = yield Course_model_1.default.find({
             _id: { $in: purchasedCourseIds },
         }).select("name description thumbnail category instructor rating purchased duration courseData");
-        // 🔧 Ensure TypeScript knows the type of `course`
         const coursesWithProgress = courses.map((courseDoc) => {
-            const course = courseDoc.toObject(); // 👈 fix type here
-            const progressData = user.courseProgress.find((p) => p.courseId.toString() === course._id.toString());
+            const course = courseDoc.toObject();
+            const progressData = user.courseProgress.find((p) => String(p.courseId) === String(course._id));
             return Object.assign(Object.assign({}, course), { progress: progressData
                     ? {
                         percentage: progressData.progress,
@@ -556,14 +556,19 @@ exports.getUserPurchasedCourses = (0, CatchAsyncError_1.CatchAsyncError)((req, r
                         lastAccessed: null,
                     } });
         });
+        // Cache individual purchase statuses
+        for (const course of coursesWithProgress) {
+            yield RedisConnect_1.client.set(`purchase:${userId}:${course._id}`, "true", { EX: 604800 });
+        }
         yield RedisConnect_1.client.set(cacheKey, JSON.stringify(coursesWithProgress), { EX: 604800 });
-        res.status(200).json({
+        console.log(`Cached purchased courses for user ${userId}`);
+        return res.status(200).json({
             success: true,
             data: coursesWithProgress,
         });
     }
     catch (err) {
         console.error("getUserPurchasedCourses error:", err);
-        next(new AppError_1.AppError("Failed to fetch purchased courses", 500));
+        return next(new AppError_1.AppError("Failed to fetch purchased courses", 500));
     }
 }));

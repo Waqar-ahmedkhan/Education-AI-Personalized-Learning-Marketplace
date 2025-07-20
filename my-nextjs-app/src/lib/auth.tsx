@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const endpoint = role === "admin" ? `${baseUrl}/api/v1/admin/admin-login` : `${baseUrl}/api/v1/user/login`;
+      const endpoint = role === "admin" ? `${baseUrl}/api/v1/admin/login` : `${baseUrl}/api/v1/user/login`;
 
       const res = await axios.post<LoginResponse>(
         endpoint,

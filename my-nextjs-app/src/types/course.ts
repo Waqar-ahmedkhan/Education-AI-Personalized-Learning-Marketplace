@@ -54,6 +54,22 @@ export interface Comment {
   starred?: boolean;
 }
 
+interface Lecture {
+  _id?: string;
+  title: string;
+  videoUrl: string;
+  isRequired?: boolean;
+  order: number;
+  videoLength?: number;
+  description?: string;
+  videoSection?: string;
+  videoPlayer?: string;
+  question?: Comment[];
+  quizzes?: Quiz[];
+  additionalResources?: Resource[];
+  completed?: boolean;
+}
+
 export interface Review {
   _id?: string;
   userId: string;

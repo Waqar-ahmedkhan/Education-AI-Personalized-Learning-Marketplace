@@ -18,6 +18,7 @@ import CourseCategory from "@/components/courses/CourseCategory";
 import SkeletonCoursePage from "@/components/courses/SkeletonCoursePage";
 import ErrorDisplay from "@/components/courses/ErrorDisplay";
 import CourseSidePanel from "@/components/courses/CourseActionPanel";
+import CourseRecommendations from "@/components/courses/RecommendationCourses";
 
 import {
   formatDuration,
@@ -119,7 +120,7 @@ const getThemeClass = (isDark: boolean, darkClass: string, lightClass: string): 
   isDark ? darkClass : lightClass;
 
 const GetSingleCoursePage: React.FC = () => {
-  const { token, user,  isAdmin } = useAuth(); // Add loginWithToken
+  const { token, user, isAdmin } = useAuth();
   const { resolvedTheme } = useTheme();
   const params = useParams();
   const router = useRouter();
@@ -448,6 +449,17 @@ const GetSingleCoursePage: React.FC = () => {
                 </motion.div>
               </div>
             </div>
+
+            <motion.div
+              variants={sectionVariants}
+              className="mt-16"
+            >
+              <CourseRecommendations
+                currentCourseId={state.course._id}
+                name={state.course.name}
+                category={state.course.category}
+              />
+            </motion.div>
 
             <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <motion.div variants={sectionVariants}>

@@ -29,7 +29,9 @@ export const uploadCourse = CatchAsyncError(
 
       // Validate that req.body is not empty
       if (!data || Object.keys(data).length === 0) {
-        return next(new AppError("No course data provided in request body", 400));
+        return next(
+          new AppError("No course data provided in request body", 400)
+        );
       }
 
       const thumbnail = data.thumbnail;
@@ -49,15 +51,27 @@ export const uploadCourse = CatchAsyncError(
             url: myCloud.secure_url,
           };
         } catch (cloudinaryError: any) {
-          console.error("Cloudinary upload failed:", cloudinaryError.message, cloudinaryError.stack);
-          return next(new AppError(`Failed to upload thumbnail: ${cloudinaryError.message}`, 400));
+          console.error(
+            "Cloudinary upload failed:",
+            cloudinaryError.message,
+            cloudinaryError.stack
+          );
+          return next(
+            new AppError(
+              `Failed to upload thumbnail: ${cloudinaryError.message}`,
+              400
+            )
+          );
         }
       } else {
         console.log("No thumbnail provided, setting to null.");
         data.thumbnail = null;
       }
 
-      console.log("Calling CreateCourse with data:", JSON.stringify(data, null, 2));
+      console.log(
+        "Calling CreateCourse with data:",
+        JSON.stringify(data, null, 2)
+      );
       await CreateCourse(data, res, next);
     } catch (err: any) {
       console.error("Error in uploadCourse:", err.message, err.stack);
@@ -194,8 +208,6 @@ export const getCoursesbyUser = CatchAsyncError(
     }
   }
 );
-
-
 
 // add question to the courses
 
@@ -686,7 +698,6 @@ export const generateVideoUrl = CatchAsyncError(
   }
 );
 
-
 export const getUserPurchasedCourses = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -704,10 +715,14 @@ export const getUserPurchasedCourses = CatchAsyncError(
       }
 
       console.log(`Cache miss for purchased courses: ${userId}`);
-      const user = await UserModel.findById(userId).select("courses courseProgress");
+      const user = await UserModel.findById(userId).select(
+        "courses courseProgress"
+      );
       if (!user) return next(new AppError("User not found", 404));
 
-      const purchasedCourseIds = user.courses.map((course: any) => course.courseId);
+      const purchasedCourseIds = user.courses.map(
+        (course: any) => course.courseId
+      );
 
       if (purchasedCourseIds.length === 0) {
         const emptyResponse = {
@@ -715,7 +730,9 @@ export const getUserPurchasedCourses = CatchAsyncError(
           data: [],
           message: "No courses purchased",
         };
-        await client.set(cacheKey, JSON.stringify(emptyResponse.data), { EX: 604800 });
+        await client.set(cacheKey, JSON.stringify(emptyResponse.data), {
+          EX: 604800,
+        });
         return res.status(200).json(emptyResponse);
       }
 
@@ -726,7 +743,9 @@ export const getUserPurchasedCourses = CatchAsyncError(
       );
 
       const coursesWithProgress = courses.map((courseDoc) => {
-        const course = courseDoc.toObject() as ICourse & { _id: Types.ObjectId };
+        const course = courseDoc.toObject() as ICourse & {
+          _id: Types.ObjectId;
+        };
         const progressData = user.courseProgress.find(
           (p: any) => String(p.courseId) === String(course._id)
         );
@@ -751,9 +770,13 @@ export const getUserPurchasedCourses = CatchAsyncError(
 
       // Cache individual purchase statuses
       for (const course of coursesWithProgress) {
-        await client.set(`purchase:${userId}:${course._id}`, "true", { EX: 604800 });
+        await client.set(`purchase:${userId}:${course._id}`, "true", {
+          EX: 604800,
+        });
       }
-      await client.set(cacheKey, JSON.stringify(coursesWithProgress), { EX: 604800 });
+      await client.set(cacheKey, JSON.stringify(coursesWithProgress), {
+        EX: 604800,
+      });
       console.log(`Cached purchased courses for user ${userId}`);
 
       return res.status(200).json({

@@ -694,9 +694,15 @@ export const getUserPurchasedCourses = CatchAsyncError(
       if (!userId) return next(new AppError("User not authenticated", 401));
 
       const cacheKey = `purchased_courses_${userId}`;
-      const cachedCourses = await client.get(cacheKey);
+      const forceRefresh = req.query.refresh === "true";
+      let cachedCourses = null;
+
+      if (!forceRefresh) {
+        cachedCourses = await client.get(cacheKey);
+      }
+
       if (cachedCourses) {
-        console.log(`Hitting Redis cache for purchased courses: ${userId}`);
+        console.log(`Cache hit for purchased courses: ${userId}`);
         return res.status(200).json({
           success: true,
           data: JSON.parse(cachedCourses),
@@ -722,7 +728,7 @@ export const getUserPurchasedCourses = CatchAsyncError(
       const courses = await CourseModel.find({
         _id: { $in: purchasedCourseIds },
       }).select(
-        "name description thumbnail category instructor rating purchased duration courseData"
+        "name description thumbnail category instructor rating purchased duration courseData gamification"
       );
 
       const coursesWithProgress = courses.map((courseDoc) => {

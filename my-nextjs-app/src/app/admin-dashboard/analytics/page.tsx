@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
-import axios from 'axios';
-import { toast } from 'react-hot-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import axios from "axios";
+import { toast } from "react-hot-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -17,9 +17,9 @@ import {
   Legend,
   ChartOptions,
   ChartData,
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
-import { motion, AnimatePresence } from 'framer-motion';
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
   Users,
@@ -30,27 +30,25 @@ import {
   BarChart3,
   Calendar,
   RefreshCw,
-} from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import Cookies from 'js-cookies';
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import Cookies from "js-cookie";
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-// Interface for raw analytics data from backend
+// Interface definitions
 interface RawAnalyticsData {
   last12Months: { month: string; count: number }[];
 }
 
-// Interface for processed analytics data for charts
 interface AnalyticsData {
   labels: string[];
   data: number[];
 }
 
-// Interface for user details
 interface User {
   id: string;
   name: string;
@@ -58,7 +56,6 @@ interface User {
   createdAt: string;
 }
 
-// Interface for API responses
 interface ApiResponse {
   success: boolean;
   users?: RawAnalyticsData;
@@ -73,13 +70,11 @@ interface LatestUsersResponse {
   message?: string;
 }
 
-// Interface for token refresh response
 interface RefreshTokenResponse {
   status: string;
   access_token: string;
 }
 
-// Interface for auth context
 interface AuthContextType {
   token: string | null;
   userRole: string | null;
@@ -102,7 +97,7 @@ const cardVariants = {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { duration: 0.5, ease: 'easeOut' },
+    transition: { duration: 0.5, ease: "easeOut" },
   },
   hover: {
     y: -5,
@@ -116,7 +111,7 @@ const chartVariants = {
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.7, ease: 'easeOut' },
+    transition: { duration: 0.7, ease: "easeOut" },
   },
 };
 
@@ -125,63 +120,59 @@ const headerVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: 'easeOut' },
+    transition: { duration: 0.6, ease: "easeOut" },
   },
 };
 
 export default function AnalyticsSection() {
   const { token, userRole, userName, isLoading } = useAuth() as AuthContextType;
   const router = useRouter();
-
-  // Initialize state for analytics data
   const [userData, setUserData] = useState<AnalyticsData>({ labels: [], data: [] });
   const [courseData, setCourseData] = useState<AnalyticsData>({ labels: [], data: [] });
   const [orderData, setOrderData] = useState<AnalyticsData>({ labels: [], data: [] });
   const [latestUsers, setLatestUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
   // Redirect non-admin users
   useEffect(() => {
-    if (!isLoading && (!token || userRole !== 'admin')) {
-      router.push('/forbidden?error=Access denied. Admin role required.');
+    if (!isLoading && (!token || userRole !== "admin")) {
+      router.push("/forbidden?error=Access denied. Admin role required.");
     }
   }, [isLoading, token, userRole, router]);
 
-  // Function to refresh access token
+  // Refresh token function
   const refreshToken = async (): Promise<string | null> => {
     try {
-     
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
       const res = await axios.get<RefreshTokenResponse>(
         `${baseUrl}/api/v1/user/refresh`,
         { withCredentials: true }
       );
 
-      if (res.data.status === 'success' && res.data.access_token) {
-        Cookies.set('access_token', res.data.access_token, {
+      if (res.data.status === "success" && res.data.access_token) {
+        Cookies.set("access_token", res.data.access_token, {
           expires: 7,
-          path: '/',
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
+          path: "/",
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
         });
         return res.data.access_token;
       }
-      throw new Error('Failed to refresh token');
+      throw new Error("Failed to refresh token");
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error during token refresh';
-      console.error('Token refresh error:', errorMessage);
-      toast.error('Session expired. Please log in again.');
-      router.push('/auth/admin-login?error=Session expired. Please log in again.');
+      const errorMessage = err instanceof Error ? err.message : "Unknown error during token refresh";
+      console.error("Token refresh error:", errorMessage);
+      toast.error("Session expired. Please log in again.");
+      router.push("/auth/admin-login?error=Session expired. Please log in again.");
       return null;
     }
   };
 
-  // Transform raw analytics data to chart-compatible format
+  // Transform analytics data
   const transformAnalyticsData = (rawData: RawAnalyticsData | undefined): AnalyticsData => {
     if (!rawData?.last12Months) {
-      console.warn('No last12Months data in rawData:', rawData);
       return { labels: [], data: [] };
     }
     const sortedMonths = rawData.last12Months.sort(
@@ -193,34 +184,30 @@ export default function AnalyticsSection() {
     };
   };
 
-  // Fetch analytics data with error handling
+  // Fetch analytics data
   const fetchAnalytics = async (currentToken: string) => {
-    if (!currentToken || userRole !== 'admin') return;
+    if (!currentToken || userRole !== "admin") return;
 
     try {
       setLoading(true);
-      setError('');
+      setError("");
       const headers = { Authorization: `Bearer ${currentToken}` };
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
       const fetchWithErrorHandling = async (
         url: string,
         endpointName: string,
-        dataKey: 'users' | 'courses' | 'orders'
+        dataKey: "users" | "courses" | "orders"
       ): Promise<AnalyticsData> => {
         try {
           const res = await axios.get<ApiResponse>(url, { headers });
-          console.log(`API Response for ${endpointName}:`, res.data);
           if (res.data.success) {
-            const transformedData = transformAnalyticsData(res.data[dataKey]);
-            console.log(`Transformed ${endpointName} Data:`, transformedData);
-            return transformedData;
+            return transformAnalyticsData(res.data[dataKey]);
           }
-          toast.error(`${endpointName} request failed: ${res.data.message || 'Unknown error'}`);
+          toast.error(`${endpointName} request failed: ${res.data.message || "Unknown error"}`);
           return { labels: [], data: [] };
         } catch (err: any) {
-          const errorMessage = err.response?.data?.message || 'Unknown error';
-          console.error(`${endpointName} error:`, err.response || err);
+          const errorMessage = err.response?.data?.message || "Unknown error";
           if (err.response?.status === 404) {
             toast.error(`${endpointName} endpoint not found`);
             return { labels: [], data: [] };
@@ -239,24 +226,22 @@ export default function AnalyticsSection() {
             `${baseUrl}/api/v1/get-latest-users?limit=5`,
             { headers }
           );
-          console.log('Latest Users Response:', res.data);
           if (res.data.success && res.data.latestUsers) {
             return res.data.latestUsers;
           }
-          toast.error(`Latest users request failed: ${res.data.message || 'Unknown error'}`);
+          toast.error(`Latest users request failed: ${res.data.message || "Unknown error"}`);
           return [];
         } catch (err: any) {
-          const errorMessage = err.response?.data?.message || 'Failed to fetch latest users';
-          console.error('Latest users error:', err.response || err);
+          const errorMessage = err.response?.data?.message || "Failed to fetch latest users";
           toast.error(errorMessage);
           return [];
         }
       };
 
       const [usersData, coursesData, ordersData, latestUsersData] = await Promise.all([
-        fetchWithErrorHandling(`${baseUrl}/api/v1/get-users-analytics`, 'Users analytics', 'users'),
-        fetchWithErrorHandling(`${baseUrl}/api/v1/get-courses-analytics`, 'Courses analytics', 'courses'),
-        fetchWithErrorHandling(`${baseUrl}/api/v1/get-orders-analytics`, 'Orders analytics', 'orders'),
+        fetchWithErrorHandling(`${baseUrl}/api/v1/get-users-analytics`, "Users analytics", "users"),
+        fetchWithErrorHandling(`${baseUrl}/api/v1/get-courses-analytics`, "Courses analytics", "courses"),
+        fetchWithErrorHandling(`${baseUrl}/api/v1/get-orders-analytics`, "Orders analytics", "orders"),
         fetchLatestUsers(),
       ]);
 
@@ -266,19 +251,18 @@ export default function AnalyticsSection() {
       setLatestUsers(latestUsersData);
 
       const warnings: string[] = [];
-      if (!usersData.labels.length) warnings.push('Users analytics unavailable');
-      if (!coursesData.labels.length) warnings.push('Courses analytics unavailable');
-      if (!ordersData.labels.length) warnings.push('Orders analytics unavailable');
-      if (!latestUsersData.length) warnings.push('Latest users unavailable');
+      if (!usersData.labels.length) warnings.push("Users analytics unavailable");
+      if (!coursesData.labels.length) warnings.push("Courses analytics unavailable");
+      if (!ordersData.labels.length) warnings.push("Orders analytics unavailable");
+      if (!latestUsersData.length) warnings.push("Latest users unavailable");
 
       if (warnings.length > 0) {
-        const warningMessage = `Some data unavailable: ${warnings.join(', ')}`;
+        const warningMessage = `Some data unavailable: ${warnings.join(", ")}`;
         setError(warningMessage);
         toast.error(warningMessage);
       }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Failed to load analytics data.';
-      console.error('Fetch analytics error:', err.response || err);
+      const errorMessage = err.response?.data?.message || "Failed to load analytics data.";
       if (err.response?.status === 401) {
         const newToken = await refreshToken();
         if (newToken) {
@@ -296,7 +280,7 @@ export default function AnalyticsSection() {
 
   // Initial data fetch
   useEffect(() => {
-    if (!isLoading && token && userRole === 'admin') {
+    if (!isLoading && token && userRole === "admin") {
       fetchAnalytics(token);
     }
   }, [token, userRole, isLoading]);
@@ -318,11 +302,11 @@ export default function AnalyticsSection() {
   };
 
   // Chart data configuration
-  const createChartData = (data: AnalyticsData, type: 'users' | 'courses' | 'orders'): ChartData<'line'> => {
+  const createChartData = (data: AnalyticsData, type: "users" | "courses" | "orders"): ChartData<"line"> => {
     const colors = {
-      users: { border: '#3B82F6', background: 'rgba(59, 130, 246, 0.1)', gradient: 'rgba(59, 130, 246, 0.3)' },
-      courses: { border: '#10B981', background: 'rgba(16, 185, 129, 0.1)', gradient: 'rgba(16, 185, 129, 0.3)' },
-      orders: { border: '#F59E0B', background: 'rgba(245, 158, 11, 0.1)', gradient: 'rgba(245, 158, 11, 0.3)' },
+      users: { border: "#3b82f6", background: "rgba(59, 130, 246, 0.1)", gradient: "rgba(59, 130, 246, 0.3)" },
+      courses: { border: "#10b981", background: "rgba(16, 185, 129, 0.1)", gradient: "rgba(16, 185, 129, 0.3)" },
+      orders: { border: "#f59e0b", background: "rgba(245, 158, 11, 0.1)", gradient: "rgba(245, 158, 11, 0.3)" },
     };
 
     return {
@@ -335,7 +319,7 @@ export default function AnalyticsSection() {
           backgroundColor: colors[type].gradient,
           fill: true,
           tension: 0.4,
-          pointBackgroundColor: '#ffffff',
+          pointBackgroundColor: "#ffffff",
           pointBorderColor: colors[type].border,
           pointBorderWidth: 2,
           pointRadius: 4,
@@ -347,17 +331,17 @@ export default function AnalyticsSection() {
   };
 
   // Chart options
-  const chartOptions: ChartOptions<'line'> = {
+  const chartOptions: ChartOptions<"line"> = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
+    interaction: { mode: "index", intersect: false },
     plugins: {
       legend: {
-        position: 'top',
-        labels: { usePointStyle: true, pointStyle: 'circle', padding: 15, font: { size: 14 } },
+        position: "top",
+        labels: { usePointStyle: true, pointStyle: "circle", padding: 15, font: { size: 14, family: "'Inter', sans-serif" } },
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backgroundColor: "rgba(0, 0, 0, 0.85)",
         titleFont: { size: 14 },
         bodyFont: { size: 12 },
         padding: 10,
@@ -370,28 +354,28 @@ export default function AnalyticsSection() {
     scales: {
       x: {
         grid: { display: false },
-        ticks: { font: { size: 12 }, maxRotation: 45, minRotation: 45 },
+        ticks: { font: { size: 12, family: "'Inter', sans-serif" }, maxRotation: 45, minRotation: 45 },
       },
       y: {
-        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
         ticks: {
-          font: { size: 12 },
+          font: { size: 12, family: "'Inter', sans-serif" },
           callback: (value) => value.toLocaleString(),
-          stepSize: 1,
+          stepSize: Math.max(...userData.data, ...courseData.data, ...orderData.data) / 5,
         },
         beginAtZero: true,
       },
     },
     animation: {
       duration: 1500,
-      easing: 'easeInOutQuad',
+      easing: "easeInOutQuad",
     },
   };
 
   // Loading state
   if (isLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-200 dark:from-gray-900 dark:to-gray-800">
         <motion.div
           className="flex flex-col items-center space-y-4"
           initial={{ opacity: 0 }}
@@ -400,8 +384,8 @@ export default function AnalyticsSection() {
         >
           <motion.div
             animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-            className="h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full"
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="h-12 w-12 border-4 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full"
           />
           <p className="text-gray-600 dark:text-gray-300">Loading Analytics...</p>
         </motion.div>
@@ -414,13 +398,15 @@ export default function AnalyticsSection() {
   const orderMetrics = calculateMetrics(orderData);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 dark:from-gray-900 dark:to-gray-800 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div variants={headerVariants} initial="hidden" animate="visible" className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">Analytics Dashboard</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white mb-4 tracking-tight">
+            Analytics Dashboard
+          </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
-            {userName ? `Welcome, ${userName}` : 'Admin Analytics Overview'}
+            {userName ? `Welcome, ${userName}` : "Admin Analytics Overview"}
           </p>
           <Button
             onClick={handleRefresh}
@@ -432,7 +418,7 @@ export default function AnalyticsSection() {
             ) : (
               <Activity className="w-4 h-4 mr-2" />
             )}
-            {refreshing ? 'Refreshing...' : 'Refresh Data'}
+            {refreshing ? "Refreshing..." : "Refresh Data"}
           </Button>
         </motion.div>
 
@@ -445,9 +431,9 @@ export default function AnalyticsSection() {
               exit={{ opacity: 0, y: -10 }}
               className="mb-8"
             >
-              <Alert className="bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 max-w-2xl mx-auto">
+              <Alert className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 max-w-2xl mx-auto rounded-lg shadow-md">
                 <AlertCircle className="h-5 w-5 text-red-600" />
-                <AlertTitle className="text-red-800 dark:text-red-300">Error</AlertTitle>
+                <AlertTitle className="text-red-800 dark:text-red-300 font-semibold">Error</AlertTitle>
                 <AlertDescription className="text-red-700 dark:text-red-400">{error}</AlertDescription>
               </Alert>
             </motion.div>
@@ -456,9 +442,9 @@ export default function AnalyticsSection() {
 
         {/* Stats Cards */}
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Users Card */}
           <motion.div variants={cardVariants} whileHover="hover">
-            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+            <Card className="relative bg-white dark:bg-gray-800/90 backdrop-blur-sm border-none shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 group-hover:from-blue-500/20 group-hover:to-indigo-500/20 transition-all duration-300" />
               <CardHeader className="bg-blue-600 text-white p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -467,8 +453,8 @@ export default function AnalyticsSection() {
                   </div>
                   <div className="flex items-center space-x-1 text-sm">
                     <TrendingUp className="w-4 h-4" />
-                    <span className={`font-medium ${userMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-                      {userMetrics.growth >= 0 ? '+' : ''}{userMetrics.growth.toFixed(1)}%
+                    <span className={`font-medium ${userMetrics.growth >= 0 ? "text-green-200" : "text-red-200"}`}>
+                      {userMetrics.growth >= 0 ? "+" : ""}{userMetrics.growth.toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -494,9 +480,9 @@ export default function AnalyticsSection() {
             </Card>
           </motion.div>
 
-          {/* Courses Card */}
-          <motion.div variants={cardVariants} whileHover="hover">
-            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+          <motion.div variants={cardVariants} whileHover="hover" transition={{ delay: 0.1 }}>
+            <Card className="relative bg-white dark:bg-gray-800/90 backdrop-blur-sm border-none shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 group-hover:from-emerald-500/20 group-hover:to-teal-500/20 transition-all duration-300" />
               <CardHeader className="bg-emerald-600 text-white p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -505,8 +491,8 @@ export default function AnalyticsSection() {
                   </div>
                   <div className="flex items-center space-x-1 text-sm">
                     <TrendingUp className="w-4 h-4" />
-                    <span className={`font-medium ${courseMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-                      {courseMetrics.growth >= 0 ? '+' : ''}{courseMetrics.growth.toFixed(1)}%
+                    <span className={`font-medium ${courseMetrics.growth >= 0 ? "text-green-200" : "text-red-200"}`}>
+                      {courseMetrics.growth >= 0 ? "+" : ""}{courseMetrics.growth.toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -532,9 +518,9 @@ export default function AnalyticsSection() {
             </Card>
           </motion.div>
 
-          {/* Orders Card */}
-          <motion.div variants={cardVariants} whileHover="hover">
-            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+          <motion.div variants={cardVariants} whileHover="hover" transition={{ delay: 0.2 }}>
+            <Card className="relative bg-white dark:bg-gray-800/90 backdrop-blur-sm border-none shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-red-500/10 group-hover:from-amber-500/20 group-hover:to-red-500/20 transition-all duration-300" />
               <CardHeader className="bg-amber-600 text-white p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -543,8 +529,8 @@ export default function AnalyticsSection() {
                   </div>
                   <div className="flex items-center space-x-1 text-sm">
                     <TrendingUp className="w-4 h-4" />
-                    <span className={`font-medium ${orderMetrics.growth >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-                      {orderMetrics.growth >= 0 ? '+' : ''}{orderMetrics.growth.toFixed(1)}%
+                    <span className={`font-medium ${orderMetrics.growth >= 0 ? "text-green-200" : "text-red-200"}`}>
+                      {orderMetrics.growth >= 0 ? "+" : ""}{orderMetrics.growth.toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -573,7 +559,7 @@ export default function AnalyticsSection() {
 
         {/* Latest Users Table */}
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="mb-8">
-          <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+          <Card className="relative bg-white dark:bg-gray-800/90 backdrop-blur-sm border-none shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
             <CardHeader className="p-4 bg-blue-50 dark:bg-blue-900/20">
               <div className="flex items-center space-x-2">
                 <Users className="w-5 h-5 text-blue-600" />
@@ -618,9 +604,8 @@ export default function AnalyticsSection() {
 
         {/* Charts */}
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* User Growth Chart */}
           <motion.div variants={chartVariants}>
-            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+            <Card className="relative bg-white dark:bg-gray-800/90 backdrop-blur-sm border-none shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
               <CardHeader className="p-4 bg-blue-50 dark:bg-blue-900/20">
                 <div className="flex items-center space-x-2">
                   <BarChart3 className="w-5 h-5 text-blue-600" />
@@ -630,9 +615,9 @@ export default function AnalyticsSection() {
                 </div>
               </CardHeader>
               <CardContent className="p-4">
-                <div className="h-[300px]">
+                <div className="h-[350px]">
                   {userData.labels.length ? (
-                    <Line data={createChartData(userData, 'users')} options={chartOptions} />
+                    <Line data={createChartData(userData, "users")} options={chartOptions} />
                   ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
                       <div className="text-center">
@@ -646,9 +631,8 @@ export default function AnalyticsSection() {
             </Card>
           </motion.div>
 
-          {/* Course Creation Chart */}
           <motion.div variants={chartVariants}>
-            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+            <Card className="relative bg-white dark:bg-gray-800/90 backdrop-blur-sm border-none shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
               <CardHeader className="p-4 bg-emerald-50 dark:bg-emerald-900/20">
                 <div className="flex items-center space-x-2">
                   <BookOpen className="w-5 h-5 text-emerald-600" />
@@ -658,9 +642,9 @@ export default function AnalyticsSection() {
                 </div>
               </CardHeader>
               <CardContent className="p-4">
-                <div className="h-[300px]">
+                <div className="h-[350px]">
                   {courseData.labels.length ? (
-                    <Line data={createChartData(courseData, 'courses')} options={chartOptions} />
+                    <Line data={createChartData(courseData, "courses")} options={chartOptions} />
                   ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
                       <div className="text-center">
@@ -674,9 +658,8 @@ export default function AnalyticsSection() {
             </Card>
           </motion.div>
 
-          {/* Orders Chart */}
           <motion.div variants={chartVariants} className="lg:col-span-2">
-            <Card className="bg-white dark:bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+            <Card className="relative bg-white dark:bg-gray-800/90 backdrop-blur-sm border-none shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
               <CardHeader className="p-4 bg-amber-50 dark:bg-amber-900/20">
                 <div className="flex items-center space-x-2">
                   <ShoppingCart className="w-5 h-5 text-amber-600" />
@@ -686,9 +669,9 @@ export default function AnalyticsSection() {
                 </div>
               </CardHeader>
               <CardContent className="p-4">
-                <div className="h-[350px]">
+                <div className="h-[400px]">
                   {orderData.labels.length ? (
-                    <Line data={createChartData(orderData, 'orders')} options={chartOptions} />
+                    <Line data={createChartData(orderData, "orders")} options={chartOptions} />
                   ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
                       <div className="text-center">

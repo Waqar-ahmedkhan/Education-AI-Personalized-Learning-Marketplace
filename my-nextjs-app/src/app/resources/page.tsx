@@ -78,35 +78,35 @@ const Page = () => {
   ];
 
   const staff: StaffMember[] = [
-    {
-      name: "Dr. Noormast",
+     {
+      name: "Dr. Sanaullah Khan",
       role: "Professor",
-      education: "PhD in Computer Science",
-      expertise: "Web Development, Networking Expert",
+      education: "PhD in Computer Vision and Artificial Intelligence",
+      expertise: "Computer Vision, AI, Deep Learning",
     },
     {
-      name: "Dr. Samina",
+      name: "Dr. Qadeem",
       role: "Associate Professor",
-      education: "PhD in Artificial Intelligence",
-      expertise: "AI and Machine Learning",
+      education: "PhD in Machine Learning",
+      expertise: "Desktop Application Development, C#, .NET",
     },
     {
-      name: "Mr. Faisal Baseer",
-      role: "Project Manager",
-      education: "MBA",
-      expertise: "Software Project Management",
+      name: "Mr. Ilyas Ahmed",
+      role: "Networking Specialist",
+      education: "MSc in Computer Networks",
+      expertise: "Networking, Network Security, Routing & Switching",
     },
     {
-      name: "Dr. Abrar",
-      role: "Senior Lecturer",
-      education: "PhD in Computer Engineering",
-      expertise: "Assembly Language, Operating System",
+      name: "Mr. Tahir Naeem",
+      role: "IT Specialist",
+      education: "BSc in Information Technology",
+      expertise: "System Administration, Technical Support, Infrastructure",
     },
     {
-      name: "Ms. Zara Ahmed",
-      role: "Research Fellow",
-      education: "MPhil in Data Science, COMSATS, Islamabad",
-      expertise: "Data Analytics, Cloud Computing",
+      name: "Mr. Omar Farooq",
+      role: "Systems Architect",
+      education: "BSc Engineering, UET Lahore",
+      expertise: "System Design, Cybersecurity",
     },
     {
       name: "Mr. Omar Farooq",

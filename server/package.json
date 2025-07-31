@@ -4,9 +4,9 @@
   "description": "this is our final year project",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "ts-node src/server.ts",
+    "build": "node init && tsc",
+    "start": "node init && node dist/server.js",
+    "dev": "node init && ts-node src/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Waqar ahmed",

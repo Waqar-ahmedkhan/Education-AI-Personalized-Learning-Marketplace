@@ -1,3 +1,6 @@
+ <img width="2480" height="3508" alt="Eduai Fypf" src="https://github.com/user-attachments/assets/6257eca5-1f0a-443e-bb10-239b89e1645e" />
+
+
 # EduAI – AI-Powered Personalized Learning Marketplace 🎓🤖
 
 **Built with 💻 by [Waqar-ahmedkhan](https://github.com/Waqar-ahmedkhan)**

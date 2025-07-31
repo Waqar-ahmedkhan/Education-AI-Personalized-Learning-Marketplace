@@ -1,4 +1,4 @@
-# EduAI – AI-Powered E-Learning Marketplace 🎓🤖
+# EduAI – AI-Powered Personalized Learning Marketplace 🎓🤖
 
 **Built with 💻 by [Waqar-ahmedkhan](https://github.com/Waqar-ahmedkhan)**
 📩 Contact: [waqarahmed44870@gmail.com](mailto:waqarahmed44870@gmail.com)
